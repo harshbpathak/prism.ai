@@ -1,0 +1,298 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 47.4% 11.2%;
+
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 47.4% 11.2%;
+
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 47.4% 11.2%;
+
+    --primary: 222.2 47.4% 11.2%;
+    --primary-foreground: 210 40% 98%;
+
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+
+    --destructive: 0 100% 50%;
+    --destructive-foreground: 210 40% 98%;
+
+    --ring: 215 20.2% 65.1%;
+
+    --radius: 0.5rem;
+
+    --main: oklch(0.97 0 0);
+    --main-secondary: oklch(97% 0 0);
+    --main-foreground: oklch(0.925 0 0);
+    --main-muted: oklch(0.96 0 0);
+    --main-background: oklch(0.97 0 0);
+    --main-invert: oklch(0.205 0 0);
+    --primary-muted: oklch(0.556 0 0);
+    --primary-invert: oklch(1 0 0);
+
+    --sidebar-background: 0 0% 98%;
+
+    --sidebar-foreground: 240 5.3% 26.1%;
+
+    --sidebar-primary: 240 5.9% 10%;
+
+    --sidebar-primary-foreground: 0 0% 98%;
+
+    --sidebar-accent: 240 4.8% 95.9%;
+
+    --sidebar-accent-foreground: 240 5.9% 10%;
+
+    --sidebar-border: 220 13% 91%;
+
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+
+  .dark {
+    --background: 224 71% 4%;
+    --foreground: 213 31% 91%;
+
+    --muted: 223 47% 11%;
+    --muted-foreground: 215.4 16.3% 56.9%;
+
+    --accent: 216 34% 17%;
+    --accent-foreground: 210 40% 98%;
+
+    --popover: 224 71% 4%;
+    --popover-foreground: 215 20.2% 65.1%;
+
+    --border: 216 34% 17%;
+    --input: 216 34% 17%;
+
+    --card: 224 71% 4%;
+    --card-foreground: 213 31% 91%;
+
+    --primary: 210 40% 98%;
+    --primary-foreground: 222.2 47.4% 1.2%;
+
+    --secondary: 222.2 47.4% 11.2%;
+    --secondary-foreground: 210 40% 98%;
+
+    --destructive: 0 63% 31%;
+    --destructive-foreground: 210 40% 98%;
+
+    --ring: 216 34% 17%;
+
+    --radius: 0.5rem;
+
+    --main: oklch(0.178 0 0);
+    --main-secondary: oklch(0.205 0 0);
+    --main-foreground: oklch(0.269 0 0);
+    --main-muted: oklch(0.168 0 0);
+    --main-background: oklch(0.145 0 0);
+    --main-invert: oklch(0.8 0 0);
+    --primary-invert: oklch(0 0 0);
+    --primary-muted: oklch(0.708 0 0);
+
+    --sidebar-background: 240 5.9% 10%;
+
+    --sidebar-foreground: 240 4.8% 95.9%;
+
+    --sidebar-primary: 224.3 76.3% 48%;
+
+    --sidebar-primary-foreground: 0 0% 100%;
+
+    --sidebar-accent: 240 3.7% 15.9%;
+
+    --sidebar-accent-foreground: 240 4.8% 95.9%;
+
+    --sidebar-border: 240 3.7% 15.9%;
+
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+  .theme {
+    --animate-aurora: aurora 8s ease-in-out infinite alternate;
+    --animate-marquee: marquee var(--duration) infinite linear;
+    --animate-marquee-vertical: marquee-vertical var(--duration) linear infinite;
+    --animate-shimmer-slide: shimmer-slide var(--speed) ease-in-out infinite alternate;
+    --animate-spin-around: spin-around calc(var(--speed) * 2) infinite linear;
+    --animate-shiny-text: shiny-text 8s infinite;
+    --color-main: var(--main);
+    --color-main-secondary: var(--main-secondary);
+    --color-main-foreground: var(--main-foreground);
+    --color-main-muted: var(--main-muted);
+    --color-main-background: var(--main-background);
+    --color-main-invert: var(--main-invert);
+    --color-primary: var(--primary);
+    --color-primary-foreground: var(--primary-foreground);
+    --color-primary-muted: var(--primary-muted);
+    --color-primary-invert: var(--primary-invert);
+    --color-border: var(--border);
+    --animate-shine: shine 6s linear infinite;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* Custom styles for the digital twin editor */
+.node {
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.node:hover {
+  filter: brightness(1.1);
+}
+
+.node.selected {
+  stroke: hsl(var(--primary));
+  stroke-width: 2px;
+}
+
+.edge {
+  stroke: hsl(var(--muted-foreground));
+  stroke-width: 2px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.edge:hover {
+  stroke: hsl(var(--primary));
+  stroke-width: 3px;
+}
+
+.edge.selected {
+  stroke: hsl(var(--primary));
+  stroke-width: 3px;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: hsl(var(--muted));
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--muted-foreground) / 0.5);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground) / 0.7);
+}
+
+/* Vertical writing mode for collapsed panel */
+.writing-mode-vertical {
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+}
+
+/* React Flow Template Group Styling - Minimal Subflow Effect */
+.template-group {
+  background: rgba(0, 0, 0, 0.02) !important;
+  border: 1px dashed rgba(0, 0, 0, 0.1) !important;
+  border-radius: 8px !important;
+  transition: all 0.2s ease;
+}
+
+.template-group:hover {
+  background: rgba(0, 0, 0, 0.03) !important;
+  border: 1px dashed rgba(0, 0, 0, 0.15) !important;
+}
+
+.template-group.selected {
+  background: rgba(59, 130, 246, 0.05) !important;
+  border: 1px dashed rgba(59, 130, 246, 0.3) !important;
+}
+
+/* Override React Flow default group styling with minimal boundaries */
+.react-flow__node-group {
+  background: rgba(0, 0, 0, 0.02) !important;
+  border: 1px dashed rgba(0, 0, 0, 0.1) !important;
+  border-radius: 8px !important;
+}
+
+.react-flow__node-group:hover {
+  background: rgba(0, 0, 0, 0.03) !important;
+  border: 1px dashed rgba(0, 0, 0, 0.15) !important;
+}
+
+.react-flow__node-group.selected {
+  background: rgba(59, 130, 246, 0.05) !important;
+  border: 1px dashed rgba(59, 130, 246, 0.3) !important;
+}
+
+/* Dark mode support for template groups */
+.dark .template-group {
+  background: rgba(255, 255, 255, 0.02) !important;
+  border: 1px dashed rgba(255, 255, 255, 0.1) !important;
+}
+
+.dark .template-group:hover {
+  background: rgba(255, 255, 255, 0.03) !important;
+  border: 1px dashed rgba(255, 255, 255, 0.15) !important;
+}
+
+.dark .template-group.selected {
+  background: rgba(59, 130, 246, 0.08) !important;
+  border: 1px dashed rgba(59, 130, 246, 0.4) !important;
+}
+
+.dark .react-flow__node-group {
+  background: rgba(255, 255, 255, 0.02) !important;
+  border: 1px dashed rgba(255, 255, 255, 0.1) !important;
+}
+
+.dark .react-flow__node-group:hover {
+  background: rgba(255, 255, 255, 0.03) !important;
+  border: 1px dashed rgba(255, 255, 255, 0.15) !important;
+}
+
+.dark .react-flow__node-group.selected {
+  background: rgba(59, 130, 246, 0.08) !important;
+  border: 1px dashed rgba(59, 130, 246, 0.4) !important;
+}
+
+.react-flow__attribution {
+  background: transparent !important;
+  border: 1px dashed rgba(59, 130, 246, 0.4) !important;
+}
+
+@layer utilities {
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+  .scrollbar-hide {
+    -ms-overflow-style: none; /* IE and Edge */
+    scrollbar-width: none; /* Firefox */
+  }
+}
+
+@keyframes shine {
+  from {
+    background-position: 0 0;
+  }
+  to {
+    background-position: -400% 0;
+  }
+}
