@@ -1,0 +1,10 @@
+packages:
+  - .
+
+onlyBuiltDependencies:
+  - '@scarf/scarf'
+  - '@sentry/cli'
+  - '@vercel/speed-insights'
+  - protobufjs
+  - sharp
+  - sqlite3

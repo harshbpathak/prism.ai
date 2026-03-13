@@ -1,0 +1,1 @@
+// This layout is now redundant and should be removed to avoid confusion.
