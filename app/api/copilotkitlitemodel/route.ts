@@ -1,0 +1,23 @@
+import {
+  CopilotRuntime,
+  GoogleGenerativeAIAdapter,
+  copilotRuntimeNextJSAppRouterEndpoint,
+} from '@copilotkit/runtime';
+
+import { NextRequest } from 'next/server';
+import { getCopilotKitConfig } from '@/lib/ai-config';
+
+// Uses AI_MODELS.chatLite + GOOGLE_API_KEY_AGENTS (or fallback to main key)
+// To change model or key, edit lib/ai-config.ts
+const { model, apiKey } = getCopilotKitConfig('lite');
+const serviceAdapter = new GoogleGenerativeAIAdapter({ model, apiKey });
+const runtime = new CopilotRuntime();
+
+export const POST = async (req: NextRequest) => {
+  const { handleRequest } = copilotRuntimeNextJSAppRouterEndpoint({
+    runtime,
+    serviceAdapter,
+    endpoint: '/api/copilotkitlitemodel',
+  });
+  return handleRequest(req);
+};
