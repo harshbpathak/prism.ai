@@ -15,12 +15,10 @@ const sampleSupplyChains: Partial<SupplyChain>[] = [
     name: "Electronics Supply Chain",
     description:
       "Global electronics component supply chain with manufacturing in Asia and distribution in North America and Europe.",
-    status: "active",
   },
   {
     name: "Automotive Supply Chain",
     description: "Automotive parts supply chain with suppliers across multiple regions.",
-    status: "active",
   },
 ]
 
@@ -88,51 +86,41 @@ async function seedNodesAndEdges(supplyChainId: string) {
       supply_chain_id: supplyChainId,
       type: "supplier",
       name: "Supplier A",
-      x: 100,
-      y: 100,
       capacity: 100,
-      current_inventory: 80,
       risk_level: 30,
+      data: { x: 100, y: 100, current_inventory: 80 }
     },
     {
       supply_chain_id: supplyChainId,
       type: "warehouse",
       name: "Warehouse B",
-      x: 300,
-      y: 200,
       capacity: 200,
-      current_inventory: 60,
       risk_level: 20,
+      data: { x: 300, y: 200, current_inventory: 60 }
     },
     {
       supply_chain_id: supplyChainId,
       type: "factory",
       name: "Factory C",
-      x: 500,
-      y: 100,
       capacity: 150,
-      current_inventory: 40,
       risk_level: 50,
+      data: { x: 500, y: 100, current_inventory: 40 }
     },
     {
       supply_chain_id: supplyChainId,
       type: "distribution",
       name: "Distribution D",
-      x: 700,
-      y: 200,
       capacity: 180,
-      current_inventory: 70,
       risk_level: 40,
+      data: { x: 700, y: 200, current_inventory: 70 }
     },
     {
       supply_chain_id: supplyChainId,
       type: "supplier",
       name: "Supplier E",
-      x: 100,
-      y: 300,
       capacity: 120,
-      current_inventory: 50,
       risk_level: 60,
+      data: { x: 100, y: 300, current_inventory: 50 }
     },
   ]
 
@@ -151,33 +139,29 @@ async function seedNodesAndEdges(supplyChainId: string) {
         supply_chain_id: supplyChainId,
         from_node_id: nodes[0].node_id, // Supplier A to Warehouse B
         to_node_id: nodes[1].node_id,
-        relationship_type: "transport",
-        cost: 100,
-        transit_time: 2,
+        type: "transport",
+        data: { cost: 100, transit_time: 2 }
       },
       {
         supply_chain_id: supplyChainId,
         from_node_id: nodes[1].node_id, // Warehouse B to Factory C
         to_node_id: nodes[2].node_id,
-        relationship_type: "transport",
-        cost: 150,
-        transit_time: 3,
+        type: "transport",
+        data: { cost: 150, transit_time: 3 }
       },
       {
         supply_chain_id: supplyChainId,
         from_node_id: nodes[2].node_id, // Factory C to Distribution D
         to_node_id: nodes[3].node_id,
-        relationship_type: "transport",
-        cost: 200,
-        transit_time: 4,
+        type: "transport",
+        data: { cost: 200, transit_time: 4 }
       },
       {
         supply_chain_id: supplyChainId,
         from_node_id: nodes[4].node_id, // Supplier E to Warehouse B
         to_node_id: nodes[1].node_id,
-        relationship_type: "transport",
-        cost: 120,
-        transit_time: 2.5,
+        type: "transport",
+        data: { cost: 120, transit_time: 2.5 }
       },
     ]
 

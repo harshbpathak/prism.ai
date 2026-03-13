@@ -35,6 +35,7 @@ interface Node {
   id: number
   name: string
   tasks: Task[]
+  progress: number
 }
 
 interface NodeGanttTimelineProps {

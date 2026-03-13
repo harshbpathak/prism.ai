@@ -1,6 +1,6 @@
 import { createGoogleGenerativeAI } from "@ai-sdk/google"
 import { getAIKeyForModule } from "@/lib/ai-config"
-import { generateObject } from "ai"
+import { generateObject, type CoreMessage } from "ai"
 import { NextResponse } from "next/server"
 import { z } from "zod"
 
@@ -15,11 +15,6 @@ const SupplyChainSuggestionSchema = z.object({
       title: z.string()
         .min(1)
         .max(50)
-        .transform(val => {
-          // Automatically truncate to 3 words if longer
-          const words = val.trim().split(/\s+/);
-          return words.length > 3 ? words.slice(0, 3).join(' ') : val;
-        })
         .describe("Brief title of the suggestion (max 3 words)"),
       description: z.string().describe("Detailed description of the suggestion that explains the supply chain context, current situation analysis, potential impact, and reasoning behind the recommendation. Should include relevant supply chain metrics, risk factors, and operational implications where applicable."),
       action: z.string().describe("Specific action to take"),
@@ -110,7 +105,7 @@ export async function POST(req: Request) {
       )
     }
 
-    let messages
+    let messages: CoreMessage[]
     try {
       const body = await req.json()
       console.log('Request body parsed:', body)
@@ -197,12 +192,21 @@ export async function POST(req: Request) {
         temperature: 0.7,
       })
 
+      // Truncate titles manually if they exceed 3 words
+      const suggestions = result.object.suggestions.map(s => {
+        const words = s.title.trim().split(/\s+/);
+        return {
+          ...s,
+          title: words.length > 3 ? words.slice(0, 3).join(' ') : s.title
+        };
+      });
+
       console.log('AI service call successful:', result.object)
       console.log('Usage:', result.usage)
       console.groupEnd()
       
       return NextResponse.json({
-        suggestions: result.object.suggestions,
+        suggestions,
         usage: result.usage
       })
       
@@ -367,7 +371,7 @@ export async function POST(req: Request) {
               description: "Consider building safety stock buffers for critical components.",
               action: "Review inventory levels and implement buffer stock for high-risk nodes.",
               confidence: 72,
-              category: "resilience"
+              category: "planning"
             }
           ],
           usage: { fallback: true, reason: 'rate_limit' }

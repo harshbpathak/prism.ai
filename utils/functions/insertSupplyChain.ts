@@ -27,7 +27,7 @@ interface ProductInventory {
  * @param {Array} nodes - Array of nodes in the supply chain
  * @returns {Promise<{nodes: Array, productInventories: ProductInventory[]}>} - Processed nodes and separate product inventories
  */
-async function processProductSheets(nodes) {
+async function processProductSheets(nodes: any[]) {
 
     const productInventories: ProductInventory[] = [];
 
@@ -90,7 +90,7 @@ async function processProductSheets(nodes) {
  * @param {Object} data - The full supply chain object
  * @returns {Promise<{ success: boolean, data?: any, error?: any }>}
  */
-async function insertSupplyChain(data) {
+async function insertSupplyChain(data: any) {
     try {
         const {
             name,

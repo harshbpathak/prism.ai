@@ -81,7 +81,7 @@ export async function getLatestSupplyChainIntel(
       .from('supply_chain_intel')
       .select('*')
       .eq('supply_chain_id', supplyChainId)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false }) as { data: any[] | null, error: any };
     
     if (error) {
       console.error('Error fetching supply chain intel:', error);

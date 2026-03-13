@@ -80,8 +80,8 @@ export default function MainLayout({
     checkAuth()
 
     // Listen for auth changes
-    const { data: { subscription } } = supabaseClient.auth.onAuthStateChange(
-      (event, session) => {
+    const { data: authData } = supabaseClient.auth.onAuthStateChange(
+      (event: any, session: any) => {
         if (event === 'SIGNED_OUT' ){
           router.push('/')
         }else if(!session) {
@@ -90,7 +90,7 @@ export default function MainLayout({
       }
     )
 
-    return () => subscription.unsubscribe()
+    return () => authData.subscription.unsubscribe()
   }, [router])
 
   if (isLoading) {

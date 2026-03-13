@@ -98,7 +98,7 @@ export const tavilyTools = (
             'Include AI-generated answer to query - basic is quick, advanced is detailed'
           ),
         includeRawContent: z
-          .boolean()
+          .enum(['text', 'markdown'])
           .optional()
           .describe('Include cleaned HTML content of each result'),
         includeDomains: z

@@ -111,12 +111,14 @@ const ViewModeAIChatPanel: React.FC<ViewModeAIChatPanelProps> = ({
   }, [recentQueries]);
 
   // CopilotKit chat integration
+  const copilotChat = useCopilotChat();
   const {
     visibleMessages,
     appendMessage,
     isLoading,
-    setMessages,
-  } = useCopilotChat();
+  } = copilotChat;
+  
+  const setMessages = (copilotChat as any).setMessages;
   
   const messages = visibleMessages as TextMessage[];
 
@@ -134,7 +136,7 @@ const ViewModeAIChatPanel: React.FC<ViewModeAIChatPanelProps> = ({
 
   // Save chat to localStorage whenever messages change
   useEffect(() => {
-    if (twinId && messages.length > 0 && hasLoadedFromStorage) {
+    if (twinId && messages?.length > 0 && hasLoadedFromStorage) {
       const timer = setTimeout(() => {
         saveChatToStorage(messages, twinId);
       }, 500);
