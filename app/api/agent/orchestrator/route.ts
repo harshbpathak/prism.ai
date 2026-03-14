@@ -3,11 +3,11 @@ import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { NextRequest, NextResponse } from 'next/server';
 import { getAIKeyForModule, AI_MODELS } from '@/lib/ai-config';
 import { tool } from 'ai';
-import { 
+import {
   agentTools,
-  defaultToolSet 
+  defaultToolSet
 } from '../../coordination/agent-tools';
-import { 
+import {
   createCoordinationSession,
   determineStartingAgent,
   calculateWorkflowEfficiency,
@@ -25,39 +25,39 @@ export const maxDuration = 60;
  */
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
-  
+
   try {
     // Parse and validate request
     const body: OrchestratorRequest = await request.json();
     const { query, nodeId, context, preferences = {} } = body;
-    
+
     // Extract userId from request for database queries - ensure proper handling
     const userId = (body as any).userId || null;
-    
+
     if (!query) {
       return NextResponse.json(
         { error: 'Query is required for orchestration' },
         { status: 400 }
       );
     }
-    
+
     console.log(`[ORCHESTRATOR] 🎯 Starting FAST multi-agent workflow for query: "${query}"`);
     console.log(`[ORCHESTRATOR] 👤 User ID: ${userId || 'Anonymous'}`);
     console.log(`[ORCHESTRATOR] 📍 Node ID: ${nodeId || 'All nodes'}`);
     console.log(`[ORCHESTRATOR] ⚙️ Preferences:`, preferences);
     console.log(`[ORCHESTRATOR] ⚡ Using cached database data for speed`);
-    
+
     // Create or use existing coordination session
     const coordinationSession = context || createCoordinationSession(query, nodeId);
     console.log(`[ORCHESTRATOR] 🆔 Session: ${coordinationSession.sessionId}`);
-    
+
     // Determine optimal starting point and max steps based on preferences
     const startingAgent = determineStartingAgent(query);
-    const maxSteps = (preferences as any).depth === 'basic' ? 3 : 
-                    (preferences as any).depth === 'comprehensive' ? 8 : 6;
-    
+    const maxSteps = (preferences as any).depth === 'basic' ? 3 :
+      (preferences as any).depth === 'comprehensive' ? 8 : 6;
+
     console.log(`[ORCHESTRATOR] 🚀 Starting with ${startingAgent} agent, max ${maxSteps} steps`);
-    
+
     // Configure Google provider with dedicated key if available
     const google = createGoogleGenerativeAI({
       apiKey: getAIKeyForModule('orchestrator')
@@ -75,7 +75,7 @@ export async function POST(request: NextRequest) {
         assessImpact: agentTools.assessImpact,
         generateStrategy: agentTools.generateStrategy
       },
-      
+
       system: `You are the PRISM Master Orchestrator - an advanced AI coordination system for supply chain intelligence.
 
 🎯 Your Mission: 
@@ -140,14 +140,14 @@ Think step by step:
 
 Begin the coordinated analysis now.`
     });
-    
+
     const totalTime = Date.now() - startTime;
-    
+
     // Process coordination steps - fix the result access
     const coordinationLogs: CoordinationStep[] = steps.map((step, index) => {
       const toolCalls = step.toolCalls || [];
       const stepOutput = toolCalls.length > 0 ? toolCalls.map(tc => (tc as any).result) : null;
-      
+
       return {
         stepNumber: index + 1,
         agent: toolCalls.length > 0 ? toolCalls[0].toolName : 'orchestrator',
@@ -159,24 +159,24 @@ Begin the coordinated analysis now.`
         nextAgentRecommendation: extractNextAgentFromStep(step)
       };
     });
-    
+
     // Extract unique agents involved
     const agentsInvolved = [...new Set(
       coordinationLogs
         .map(log => log.agent)
         .filter(agent => agent !== 'orchestrator')
     )];
-    
+
     // Calculate workflow efficiency
     const workflowEfficiency = calculateWorkflowEfficiency(coordinationLogs);
-    
+
     // Extract final recommendations from the analysis
     const finalRecommendations = extractRecommendationsFromText(text);
-    
+
     console.log(`[ORCHESTRATOR] ✅ Workflow complete in ${totalTime}ms`);
     console.log(`[ORCHESTRATOR] 👥 Agents involved: ${agentsInvolved.join(', ')}`);
     console.log(`[ORCHESTRATOR] ⚡ Efficiency: ${Math.round(workflowEfficiency * 100)}%`);
-    
+
     const response: OrchestratorResponse = {
       analysis: text,
       coordinationLogs,
@@ -186,29 +186,29 @@ Begin the coordinated analysis now.`
       workflowEfficiency,
       finalRecommendations: finalRecommendations.length > 0 ? finalRecommendations : undefined
     };
-    
+
     return NextResponse.json(response);
-    
+
   } catch (error) {
     const totalTime = Date.now() - startTime;
-    
+
     console.error(`[ORCHESTRATOR] ❌ Error in orchestration:`, error);
-    
+
     // Provide helpful error responses
     if (error instanceof Error) {
       if (error.message.includes('timeout')) {
         return NextResponse.json(
-          { 
+          {
             error: 'Orchestration timeout - try reducing complexity or using basic depth preference',
             processingTime: totalTime
           },
           { status: 408 }
         );
       }
-      
+
       if (error.message.includes('quota') || error.message.includes('rate')) {
         return NextResponse.json(
-          { 
+          {
             error: 'Rate limit exceeded - please try again in a moment',
             processingTime: totalTime
           },
@@ -216,9 +216,9 @@ Begin the coordinated analysis now.`
         );
       }
     }
-    
+
     return NextResponse.json(
-      { 
+      {
         error: 'Failed to orchestrate multi-agent analysis',
         details: error instanceof Error ? error.message : 'Unknown error',
         processingTime: totalTime
@@ -233,7 +233,7 @@ Begin the coordinated analysis now.`
  */
 function extractNextAgentFromStep(step: any): { agent: string; reason: string } | undefined {
   const text = step.text?.toLowerCase() || '';
-  
+
   // Simple pattern matching for next agent mentions
   if (text.includes('forecast') && text.includes('next')) {
     return { agent: 'forecast', reason: 'Forecast analysis mentioned' };
@@ -247,7 +247,7 @@ function extractNextAgentFromStep(step: any): { agent: string; reason: string } 
   if (text.includes('strategy') && text.includes('next')) {
     return { agent: 'strategy', reason: 'Strategy planning mentioned' };
   }
-  
+
   return undefined;
 }
 
@@ -256,13 +256,13 @@ function extractNextAgentFromStep(step: any): { agent: string; reason: string } 
  */
 function extractRecommendationsFromText(text: string): string[] {
   const recommendations: string[] = [];
-  
+
   // Look for numbered lists, bullet points, or recommendation keywords
   const lines = text.split('\n');
-  
+
   for (const line of lines) {
     const trimmed = line.trim();
-    
+
     // Pattern matching for recommendations
     if (
       trimmed.match(/^\d+\./) || // Numbered list
@@ -277,7 +277,7 @@ function extractRecommendationsFromText(text: string): string[] {
       }
     }
   }
-  
+
   return recommendations.slice(0, 5); // Limit to top 5 recommendations
 }
 
@@ -296,11 +296,11 @@ export async function GET() {
         'agent-tools': 'loaded'
       }
     };
-    
+
     return NextResponse.json(health);
   } catch (error) {
     return NextResponse.json(
-      { 
+      {
         status: 'unhealthy',
         error: error instanceof Error ? error.message : 'Unknown error'
       },

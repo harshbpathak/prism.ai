@@ -281,7 +281,7 @@ export const useAISuggestions = ({ nodes, edges, messages }: UseAISuggestionsPro
     }
     suggestionTimeout.current = setTimeout(() => {
       if (nodes.length > 0) {
-        console.log('🔄 Auto-generating debounced suggestions for nodes:', nodes.length);
+        console.log('🔄 AI Suggestions: Triggering generation for', nodes.length, 'nodes');
         generateContextualSuggestions();
       }
     }, 15000); // Increased debounce to 15 seconds to save API quota

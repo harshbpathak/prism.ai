@@ -23,16 +23,8 @@ export async function invokeEdgeFunction(functionName: string, body: any) {
 // Specific wrappers for convenience
 export async function getUserSupplyChainsAction(userId: string) {
   try {
-    const { data, error } = await invokeEdgeFunction('super-worker', { user_id: userId });
-    
-    // If edge function works, return its response
-    if (!error && data) {
-      return { data, error: null };
-    }
-
-    console.warn("Edge function failed, falling back to database fetch:", error);
-    
-    // Fallback: Fetch directly from database
+    // Bypassing super-worker edge function as it returns 404
+    // Fetch directly from database
     const { data: supplyChains, error: scError } = await supabaseServer
       .from('supply_chains')
       .select('*')
@@ -89,15 +81,8 @@ export async function deleteSupplyChainAction(supplyChainId: string, organisatio
 
 export async function getSupplyChainByIdAction(supplyChainId: string) {
   try {
-    const { data, error } = await invokeEdgeFunction('dynamic-endpoint', { supply_chain_id: supplyChainId });
-    
-    if (!error && data) {
-      return { data, error: null };
-    }
-
-    console.warn("dynamic-endpoint edge function failed, falling back to database fetch:", error);
-
-    // Fallback: Fetch directly from database
+    // Bypassing dynamic-endpoint edge function as it returns 404
+    // Fetch directly from database
     const { data: supplyChain, error: scError } = await supabaseServer
       .from('supply_chains')
       .select('*')
@@ -129,14 +114,7 @@ export async function getSupplyChainByIdAction(supplyChainId: string) {
 
 export async function getNewsRoomInfoAction(userId: string) {
   try {
-    const { data, error } = await invokeEdgeFunction('get-news-room-info', { user_id: userId });
-    
-    if (!error && data) {
-      return { data, error: null };
-    }
-
-    console.warn("get-news-room-info edge function failed, falling back to empty data:", error);
-
+    // Bypassing get-news-room-info edge function as it returns 404
     // Fallback: Currently returning empty data, but this could be expanded
     // to fetch relevant news/events from the DB if a specific table exists.
     return { 

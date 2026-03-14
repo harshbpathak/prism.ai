@@ -15,11 +15,18 @@
 
 // ─── Model Names ──────────────────────────────────────────────────────────────
 // Change these to swap models globally.
-// gemini-2.0-flash has much higher free-tier limits than 2.5-flash (1500 RPD vs 50 RPD)
+//
+// ⚠️  Quota guide (free tier):
+//   gemini-2.5-flash  →   50 RPD  (premium quality, use sparingly)
+//   gemini-2.0-flash  → 1,500 RPD (good quality, high limit)
+//   gemini-2.0-flash-lite → 1,500 RPD (fastest, cheapest)
+//
+// Each orchestrator request = up to 8 API calls internally, so keep
+// agent/suggestions models on 2.0-flash to avoid hitting quota fast.
 
 export const AI_MODELS = {
-  /** Main chat model – used for CopilotKit chat & orchestrator */
-  chat: 'gemini-2.0-flash',
+  /** Main chat model – used for CopilotKit chat & primary responses */
+  chat: 'gemini-2.0-flash-lite',
   /** Lightweight chat model – used when speed/cost matters */
   chatLite: 'gemini-2.0-flash-lite',
   /** Agent analysis model – used for strategy, scenario, impact, info agents */

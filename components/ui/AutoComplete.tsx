@@ -2,8 +2,17 @@
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import debounce from 'lodash.debounce'
-import { OlaMaps } from '@/lib/OlaMap/OlaMapsWebSDK/olamaps-js-sdk.es'
-import '@/lib/OlaMap/OlaMapsWebSDK/style.css'
+import L from 'leaflet'
+import 'leaflet/dist/leaflet.css'
+
+// Fix for default Leaflet marker icons in Next.js
+// @ts-ignore
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+});
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { MapPin, Search, Loader2 } from 'lucide-react'
@@ -47,50 +56,28 @@ export default function AddressAutocompleteMap({
     const suggestionsRef = useRef<HTMLUListElement>(null)
     const selectedItemRef = useRef<HTMLLIElement>(null)
 
-    const olaMaps = useMemo(() => {
-        const apiKey = process.env.OLA_MAPS_API_KEY
-        if (!apiKey) {
-            console.error('OlaMaps API key is not configured. Please set NEXT_PUBLIC_OLA_MAPS_API_KEY environment variable.')
-            setError('Map service is not configured. Please check your API key settings.')
-            return null
-        }
-        return new OlaMaps({
-            apiKey: apiKey,
-        })
-    }, [])
-
     useEffect(() => {
         const mapContainer = document.getElementById('map')
-        if (!mapContainer || !olaMaps) return
+        if (!mapContainer) return
 
-        const myMap = olaMaps.init({
-            style: "https://api.olamaps.io/tiles/vector/v1/styles/default-light-standard-mr/style.json",
-            container: mapContainer,
-            center: [88.346142, 22.529923],
-            zoom: 15,
-        })
+        const myMap = L.map(mapContainer).setView([22.529923, 88.346142], 15)
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(myMap)
 
         mapRef.current = myMap
 
         return () => {
             if (myMap) {
-                try {
-                    // Remove marker first to avoid issues
-                    if (markerRef.current) {
-                        markerRef.current.remove()
-                        markerRef.current = null
-                    }
-                    // Remove map with error handling
-                    myMap.remove()
-                } catch (error) {
-                    // Silently handle AbortError and other cleanup errors
-                    if (error instanceof Error && error.name !== 'AbortError') {
-                        console.warn('Error during map cleanup:', error)
-                    }
-                }
+                myMap.remove()
+                // Delay map initialization slightly to ensure container is fully rendered
+                setTimeout(() => {
+                    myMap.invalidateSize();
+                }, 100);
             }
         }
-    }, [olaMaps])
+    }, [latitude, longitude]) // Add latitude/longitude dependency to re-initialize when it becomes visible if needed
 
     // Click outside handler to close suggestions
     useEffect(() => {
@@ -275,48 +262,35 @@ export default function AddressAutocompleteMap({
 
     const updateMap = (location: { lat: number; lng: number }, address: string = query) => {
         if (mapRef.current) {
-            const coordinates: [number, number] = [location.lng, location.lat]
-            mapRef.current.setCenter(coordinates)
-            mapRef.current.setZoom(15)
+            const coordinates: [number, number] = [location.lat, location.lng]
+            mapRef.current.setView(coordinates, 15)
 
             // Remove existing marker
             if (markerRef.current) {
                 markerRef.current.remove()
             }
 
-            // Add a popup if olaMaps is available
-            if (olaMaps) {
-                const popup = olaMaps
-                    .addPopup({ offset: [0, -30], anchor: 'bottom' })
-                    .setHTML(`<div>${address}</div>`)
+            const marker = L.marker(coordinates, {
+                draggable: true,
+            })
+            .bindPopup(`<div>${address}</div>`)
+            .addTo(mapRef.current)
 
-                const marker = olaMaps
-                    .addMarker({
-                        offset: [0, -15],
-                        anchor: 'bottom',
-                        color: 'red',
-                        draggable: true,
-                    })
-                    .setLngLat(coordinates)
-                    .setPopup(popup)
-                    .addTo(mapRef.current)
+            markerRef.current = marker
 
-                markerRef.current = marker
+            // Update latitude and longitude fields
+            setLatitude(location.lat.toFixed(6))
+            setLongitude(location.lng.toFixed(6))
+            onCoordinatesChange(location.lat.toFixed(6), location.lng.toFixed(6), address)
 
-                // Update latitude and longitude fields
-                setLatitude(location.lat.toFixed(6))
-                setLongitude(location.lng.toFixed(6))
-                onCoordinatesChange(location.lat.toFixed(6), location.lng.toFixed(6), address)
-
-                // Add drag event listener
-                marker.on('drag', onDrag)
-            }
+            // Add drag event listener
+            marker.on('dragend', onDrag)
         }
     }
 
     const onDrag = () => {
         if (markerRef.current) {
-            const lngLat = markerRef.current.getLngLat()
+            const lngLat = markerRef.current.getLatLng()
             console.log('Marker dragged to:', lngLat)
             setLatitude(lngLat.lat.toFixed(6))
             setLongitude(lngLat.lng.toFixed(6))
@@ -442,10 +416,15 @@ export default function AddressAutocompleteMap({
                 </div>
             )}
 
-            {/* Hidden Map Container */}
-            <div id="map" className="hidden">
-                <span className="sr-only">Map showing the selected location</span>
-            </div>
+            {/* Map Container */}
+            {(latitude || longitude) && (
+                <div 
+                    id="map" 
+                    className="w-full h-[200px] rounded-md border border-border mt-4 z-0"
+                >
+                    <span className="sr-only">Map showing the selected location</span>
+                </div>
+            )}
         </div>
     )
 }

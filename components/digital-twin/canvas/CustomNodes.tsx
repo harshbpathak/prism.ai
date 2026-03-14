@@ -258,5 +258,6 @@ export const nodeTypes = {
   warehouseNode: WarehouseNode,
   distributionNode: DistributionNode,
   retailerNode: RetailerNode,
+  customerNode: RetailerNode,  // AI sometimes generates "customerNode" — alias to retailer
   group: TemplateGroupNode,
 }; 

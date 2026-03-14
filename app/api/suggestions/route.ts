@@ -1,5 +1,5 @@
 import { createGoogleGenerativeAI } from "@ai-sdk/google"
-import { getAIKeyForModule } from "@/lib/ai-config"
+import { getAIKeyForModule, AI_MODELS } from "@/lib/ai-config"
 import { generateObject, type CoreMessage } from "ai"
 import { NextResponse } from "next/server"
 import { z } from "zod"
@@ -182,7 +182,7 @@ export async function POST(req: Request) {
       });
 
       const result = await generateObject({
-        model: google("gemini-2.0-flash"),
+        model: google(AI_MODELS.suggestions),
         schema: SupplyChainSuggestionSchema,
         messages: [
           { role: "system", content: SUPPLY_CHAIN_SUGGESTION_SYSTEM_PROMPT },

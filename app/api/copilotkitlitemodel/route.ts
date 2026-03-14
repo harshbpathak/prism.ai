@@ -9,11 +9,12 @@ import { getCopilotKitConfig } from '@/lib/ai-config';
 
 // Uses AI_MODELS.chatLite + GOOGLE_API_KEY_AGENTS (or fallback to main key)
 // To change model or key, edit lib/ai-config.ts
-const { model, apiKey } = getCopilotKitConfig('lite');
-const serviceAdapter = new GoogleGenerativeAIAdapter({ model, apiKey });
-const runtime = new CopilotRuntime();
 
 export const POST = async (req: NextRequest) => {
+  const { model, apiKey } = getCopilotKitConfig('lite');
+  const serviceAdapter = new GoogleGenerativeAIAdapter({ model, apiKey });
+  const runtime = new CopilotRuntime();
+
   const { handleRequest } = copilotRuntimeNextJSAppRouterEndpoint({
     runtime,
     serviceAdapter,

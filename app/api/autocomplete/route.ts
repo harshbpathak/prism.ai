@@ -1,8 +1,6 @@
 // app/api/autocomplete/route.ts
 
 import { NextResponse } from 'next/server';
-import { v4 as uuidv4 } from 'uuid';
-
 
 export async function GET(request: Request) {
     try {
@@ -17,46 +15,43 @@ export async function GET(request: Request) {
             );
         }
 
-        // Retrieve API key from environment variables
-        const apiKey = process.env.OLA_MAPS_API_KEY;
-        if (!apiKey) {
-            return NextResponse.json(
-                { error: 'API key is missing in environment variables.' },
-                { status: 500 }
-            );
-        }
-
-        // Generate a unique request ID
-        const requestId = uuidv4();
-
-        // Call Ola Maps Autocomplete API
-        const olaResponse = await fetch(
-            `https://api.olamaps.io/places/v1/autocomplete?input=${encodeURIComponent(
-                input
-            )}&api_key=${apiKey}`,
+        // Call OpenStreetMap Nominatim Autocomplete API
+        const osmResponse = await fetch(
+            `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(input)}&limit=5`,
             {
                 method: 'GET',
+                // Nominatim requires a valid user agent
                 headers: {
-                    'X-Request-Id': requestId,
+                    'User-Agent': 'PrismAI/1.0',
+                    'Accept-Language': 'en-US,en;q=0.9',
                 },
             }
         );
 
         // Handle non-OK responses
-        if (!olaResponse.ok) {
-            const errorData = await olaResponse.json();
+        if (!osmResponse.ok) {
+            const errorData = await osmResponse.json().catch(() => ({}));
             return NextResponse.json(
-                { error: 'Failed to fetch data from Ola Maps.', details: errorData },
-                { status: olaResponse.status }
+                { error: 'Failed to fetch data from OpenStreetMap.', details: errorData },
+                { status: osmResponse.status }
             );
         }
 
         // Parse the JSON response
-        const data = await olaResponse.json();
+        const data = await osmResponse.json();
 
-        // Optionally, you can process or sanitize the data here before sending it to the frontend
+        // Map OSM results to match the expected format { predictions: [ { description, geometry: { location: { lat, lng } } } ] }
+        const predictions = data.map((item: any) => ({
+            description: item.display_name,
+            geometry: {
+                location: {
+                    lat: parseFloat(item.lat),
+                    lng: parseFloat(item.lon),
+                }
+            }
+        }));
 
-        return NextResponse.json(data);
+        return NextResponse.json({ predictions });
     } catch (error) {
         console.error('Error in autocomplete API route:', error);
         return NextResponse.json(

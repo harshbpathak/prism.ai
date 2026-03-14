@@ -13,6 +13,7 @@ import { Trash2 } from "lucide-react";
 import { ImmersiveHeader } from './ImmersiveHeader';
 import { MessagesArea } from './MessagesArea';
 import { AutocompleteInput } from './AutocompleteInput';
+import { AISuggestionsInsights } from './AISuggestionsInsights';
 import { useCopilotActions } from './useCopilotActions';
 import { useAISuggestions } from './useAISuggestions';
 import { useChatPersistence } from './hooks/useChatPersistence';
@@ -277,6 +278,10 @@ const AIChatPanel: React.FC<AIChatPanelProps> = ({
   });
 
   const {
+    suggestions,
+    isSuggestionsLoading,
+    showSuggestions,
+    setShowSuggestions,
     autocompleteSuggestions,
     debouncedContextualSuggestions
   } = useAISuggestions({
@@ -534,6 +539,22 @@ const AIChatPanel: React.FC<AIChatPanelProps> = ({
             Clear Chat
           </Button>
         </div>
+
+        {/* Actionable AI Insights */}
+        {showSuggestions && (
+          <AISuggestionsInsights
+            suggestions={suggestions}
+            isLoading={isSuggestionsLoading}
+            onDismiss={() => setShowSuggestions(false)}
+            onApply={(suggestion) => {
+              const query = `Strategic analysis: ${suggestion.title}. ${suggestion.description} ${suggestion.action}`;
+              setInput(query);
+              handleAISubmit(query);
+              // Auto-collapse after applying to save vertical space
+              setShowSuggestions(false);
+            }}
+          />
+        )}
 
         {/* Messages Area - Full Height */}
         <MessagesArea
