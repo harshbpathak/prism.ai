@@ -91,6 +91,8 @@ const AGENT_CONFIGS = {
   }
 };
 
+import { useRouter } from 'next/navigation';
+
 export default function PrismOrchestrator({ 
   initialQuery = '', 
   initialNodeId = '' 
@@ -98,6 +100,7 @@ export default function PrismOrchestrator({
   initialQuery?: string;
   initialNodeId?: string;
 }) {
+  const router = useRouter();
   const [query, setQuery] = useState(initialQuery);
   const [nodeId, setNodeId] = useState(initialNodeId);
   const [isExecuting, setIsExecuting] = useState(false);
@@ -259,7 +262,7 @@ export default function PrismOrchestrator({
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-muted/20 to-background text-foreground p-6">
+    <div className="min-h-full flex-1 bg-gradient-to-br from-background via-muted/20 to-background text-foreground p-6">
       {/* Header */}
       <div className="mb-8">
         <div className="flex items-center gap-3 mb-2">

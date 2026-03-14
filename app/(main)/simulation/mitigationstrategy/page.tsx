@@ -626,7 +626,7 @@ export default function MitigationStrategyPage() {
   // Loading State
   if (isLoading) {
     return (
-      <div className="relative min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-100/60 dark:from-gray-900 dark:via-slate-900 dark:to-indigo-950">
+      <div className="relative min-h-full flex-1 bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-100/60 dark:from-gray-900 dark:via-slate-900 dark:to-indigo-950">
         <div className="absolute inset-0 overflow-hidden">
           <div className="absolute top-1/4 left-1/4 w-80 h-80 rounded-full bg-gradient-to-br from-purple-400/20 to-blue-400/15 dark:from-purple-900/30 dark:to-blue-900/25 blur-3xl animate-pulse"></div>
         </div>
@@ -690,7 +690,7 @@ export default function MitigationStrategyPage() {
   )
 
   return (
-    <div className="relative min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-100/60 dark:from-gray-900 dark:via-slate-900 dark:to-indigo-950">
+    <div className="relative min-h-full flex-1 bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-100/60 dark:from-gray-900 dark:via-slate-900 dark:to-indigo-950">
       {/* Background Elements */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-1/4 left-1/4 w-80 h-80 rounded-full bg-gradient-to-br from-purple-400/20 to-blue-400/15 dark:from-purple-900/30 dark:to-blue-900/25 blur-3xl animate-pulse"></div>

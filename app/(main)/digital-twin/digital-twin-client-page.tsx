@@ -251,7 +251,7 @@ export default function DigitalTwinClientPage() {
     }
 
     return (
-      <div className="flex items-center justify-center h-screen">
+      <div className="flex items-center justify-center h-full flex-1">
         <div className="text-center">
           <p className="text-lg text-gray-600">Digital twin not found.</p>
           <button

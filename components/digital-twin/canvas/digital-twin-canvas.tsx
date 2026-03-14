@@ -165,14 +165,14 @@ export default function DigitalTwinCanvas({ initialNodes, initialEdges, viewOnly
 
   if (!isHydrated) {
     return (
-      <div className="flex items-center justify-center h-screen">
+      <div className="flex items-center justify-center h-full flex-1">
         <div className="text-gray-500">Loading canvas...</div>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col h-screen">
+    <div className="flex flex-col h-[calc(100vh-4rem)]">
       {/* Only show SimulationToolbar in edit mode */}
       {!viewOnly && <SimulationToolbar {...simulationToolbarProps} />}
 

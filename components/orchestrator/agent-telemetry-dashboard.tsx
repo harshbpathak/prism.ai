@@ -328,7 +328,7 @@ export default function AgentTelemetryDashboard({
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/50 dark:from-slate-950 dark:via-slate-900/80 dark:to-slate-800/60 text-slate-900 dark:text-white">
+    <div className="min-h-full flex-1 bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/50 dark:from-slate-950 dark:via-slate-900/80 dark:to-slate-800/60 text-slate-900 dark:text-white">
       <div className="max-w-7xl mx-auto space-y-6 p-4 md:p-6">{/* Responsive padding */}
         
         {/* Header */}

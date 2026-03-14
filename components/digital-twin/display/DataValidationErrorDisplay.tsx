@@ -55,7 +55,7 @@ const DataValidationErrorDisplay: FC<DataValidationErrorDisplayProps> = ({
   const highErrors = errors.filter(e => ['invalid_nodes', 'invalid_edges'].includes(e.type)).length
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4">
+    <div className="min-h-full flex-1 flex items-center justify-center p-4">
       <Card className="shadow-md max-w-2xl w-full">
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">

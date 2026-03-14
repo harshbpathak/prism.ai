@@ -154,7 +154,7 @@ export default function DigitalTwinViewPage() {
           />
         }
       >
-        <div className="flex flex-col h-screen">
+        <div className="flex flex-col h-full flex-1">
           <ViewModeHeader title={`Supply Chain View`} />
           
           <div className="flex flex-1 overflow-hidden">

@@ -38,7 +38,7 @@ interface SupplyChainNode {
 }
 
 interface ApiResponse {
-  status: 'success' | 'error'
+  status: string
   data?: any[]
   error?: string
 }
@@ -168,7 +168,7 @@ export default function DynamicOrchestratorPage() {
   // Show loading if user is still loading or if we're loading supply chains
   if (userLoading || loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-background/90 via-card/80 to-background/95 text-foreground p-6">
+      <div className="min-h-full flex-1 bg-gradient-to-br from-background/90 via-card/80 to-background/95 text-foreground p-6">
         <div className="max-w-7xl mx-auto space-y-6">
           <div className="text-center space-y-2">
             <Skeleton className="h-12 w-96 mx-auto bg-card/80" />
@@ -182,7 +182,7 @@ export default function DynamicOrchestratorPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-background/90 via-destructive/10 to-background/95 text-foreground p-6">
+      <div className="min-h-full flex-1 bg-gradient-to-br from-background/90 via-destructive/10 to-background/95 text-foreground p-6">
         <div className="max-w-4xl mx-auto space-y-6">
           <Card className="border-destructive/40 bg-destructive/10 backdrop-blur">
             <CardHeader>
@@ -211,7 +211,7 @@ export default function DynamicOrchestratorPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background/90 via-card/80 to-background/95 text-foreground">
+    <div className="min-h-full flex-1 bg-gradient-to-br from-background/90 via-card/80 to-background/95 text-foreground">
       <div className="max-w-7xl mx-auto space-y-6 p-4 md:p-6">{/* Added responsive padding */}
         
         {/* User & Supply Chain Selection */}

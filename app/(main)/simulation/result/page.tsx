@@ -423,7 +423,7 @@ export default function SimulationResultPage() {
   // Show loading state
   if (isLoading) {
     return (
-      <div className="relative min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/40 to-indigo-100/50 dark:from-gray-900 dark:via-slate-900 dark:to-indigo-950">
+      <div className="relative min-h-full flex-1 bg-gradient-to-br from-slate-50 via-blue-50/40 to-indigo-100/50 dark:from-gray-900 dark:via-slate-900 dark:to-indigo-950">
         {/* Elegant Background Elements */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <div className="absolute top-1/4 left-1/4 w-96 h-96 rounded-full bg-gradient-to-br from-emerald-400/15 to-blue-400/10 dark:from-emerald-900/25 dark:to-blue-900/20 blur-3xl animate-pulse will-change-transform"></div>
@@ -450,7 +450,7 @@ export default function SimulationResultPage() {
   }
 
   return (
-    <div className="relative min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/40 to-indigo-100/50 dark:from-gray-900 dark:via-slate-900 dark:to-indigo-950">
+    <div className="relative min-h-full flex-1 bg-gradient-to-br from-slate-50 via-blue-50/40 to-indigo-100/50 dark:from-gray-900 dark:via-slate-900 dark:to-indigo-950">
       {/* Elegant Background Elements */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-1/4 left-1/4 w-96 h-96 rounded-full bg-gradient-to-br from-emerald-400/15 to-blue-400/10 dark:from-emerald-900/25 dark:to-blue-900/20 blur-3xl animate-pulse will-change-transform"></div>

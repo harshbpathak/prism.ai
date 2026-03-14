@@ -137,16 +137,16 @@ export function useSaveAndValidate({
       setValidationIssues(issues);
       const errors = issues.filter(issue => issue.severity === 'error');
       
+      // Only block on hard errors, not warnings
       if (errors.length > 0) {
         setShowValidationDialog(true);
         return null;
       }
       
+      // Warnings: show dialog but proceed with save anyway
       const warnings = issues.filter(issue => issue.severity === 'warning');
-      
       if (warnings.length > 0) {
-        setShowValidationDialog(true);
-        return null;
+        console.warn('⚠️ [Save] Proceeding with warnings:', warnings.map(w => w.message));
       }
       
       return await performSave();
