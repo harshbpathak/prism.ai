@@ -52,8 +52,8 @@ const SaveStatusIndicator: FC<SaveStatusIndicatorProps> = ({ saveStatus }) => {
         };
       case 'saving':
         return {
-          icon: <Loader2 className="h-4 w-4 animate-spin text-blue-600 dark:text-blue-400" />,
-          text: <TextShimmer className="text-sm font-medium text-blue-600 dark:text-blue-400" duration={1.5}>Saving</TextShimmer>,
+          icon: <Loader2 className="h-4 w-4 animate-spin text-slate-600 dark:text-slate-400" />,
+          text: <TextShimmer className="text-sm font-medium text-slate-600 dark:text-slate-400" duration={1.5}>Saving</TextShimmer>,
           className: ''
         };
       case 'saved':

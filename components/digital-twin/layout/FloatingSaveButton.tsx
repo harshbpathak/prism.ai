@@ -18,7 +18,7 @@ const FloatingSaveButton: FC<FloatingSaveButtonProps> = ({
 
   return (
     <div 
-      className="fixed top-4 right-4 z-50 group"
+      className="fixed top-20 right-4 z-50 group"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
@@ -32,20 +32,18 @@ const FloatingSaveButton: FC<FloatingSaveButtonProps> = ({
           disabled={disabled || isLoading}
           className={`
             relative flex items-center justify-center gap-2 px-6 py-3 
-            bg-gradient-to-r from-blue-600 to-indigo-600 
-            hover:from-blue-700 hover:to-indigo-700
-            text-white font-medium text-sm
-            rounded-xl shadow-lg hover:shadow-xl
+            bg-black dark:bg-white
+            hover:bg-slate-800 dark:hover:bg-slate-100
+            text-white dark:text-black font-medium text-sm
+            rounded-none shadow-none
             transition-all duration-200 ease-out
             transform hover:scale-105 active:scale-95
-            disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none
+            disabled:opacity-40 disabled:cursor-not-allowed disabled:transform-none
             min-w-[120px]
-            backdrop-blur-sm bg-opacity-95
-            border border-white/10
+            border border-black dark:border-white
           `}
         >
-          {/* Background blur effect */}
-          <div className="absolute inset-0 rounded-xl bg-white/5 backdrop-blur-sm"></div>
+          {/* No blur overlay needed for flat button */}
           
           {/* Button content */}
           <div className="relative flex items-center gap-2">
@@ -87,14 +85,7 @@ const FloatingSaveButton: FC<FloatingSaveButtonProps> = ({
         <div className="absolute -top-1 right-4 w-2 h-2 bg-gray-900 transform rotate-45"></div>
       </div>
 
-      {/* Subtle glow effect */}
-      <div className={`
-        absolute inset-0 rounded-xl 
-        bg-gradient-to-r from-blue-400 to-indigo-400
-        transition-all duration-300 ease-out
-        ${isHovered ? 'blur-xl opacity-20 scale-110' : 'blur-lg opacity-0 scale-100'}
-        -z-10
-      `}></div>
+
     </div>
   );
 };
