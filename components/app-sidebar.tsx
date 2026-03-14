@@ -14,6 +14,7 @@ import {
 import { ThemeToggle } from "@/components/theme"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
+import { NotificationDropdown } from "@/components/layout/notification-dropdown"
 
 export function AppSidebar() {
   const pathname = usePathname()
@@ -22,7 +23,6 @@ export function AppSidebar() {
     { href: "/dashboard", icon: Home, label: "Dashboard", isActive: pathname === "/dashboard" },
     { href: "/digital-twin", icon: Network, label: "Digital Twin", isActive: pathname === "/digital-twin" },
     { href: "/simulation", icon: LineChart, label: "Simulation", isActive: pathname === "/simulation" },
-    { href: "/strategy", icon: Settings, label: "Strategy", isActive: pathname === "/strategy" },
   ]
 
   const footerItems = [
@@ -30,7 +30,7 @@ export function AppSidebar() {
   ]
 
   return (
-    <div className="w-full h-16 border-t border-border/50 bg-background/95 backdrop-blur-xl flex items-center justify-between px-4 sm:px-6 shrink-0 z-[100]">
+    <div className="w-full h-16 border-b border-border/50 bg-background/95 backdrop-blur-xl flex items-center justify-between px-4 sm:px-6 shrink-0 z-[100]">
       {/* Left: Logo + Nav links */}
       <div className="flex items-center gap-4">
         <Link href="/" className="flex items-center gap-2 group">
@@ -67,7 +67,7 @@ export function AppSidebar() {
                       <span className="hidden md:block">{item.label}</span>
                     </Link>
                   </TooltipTrigger>
-                  <TooltipContent side="top">
+                  <TooltipContent side="bottom">
                     {item.label}
                   </TooltipContent>
                 </Tooltip>
@@ -77,10 +77,10 @@ export function AppSidebar() {
         </nav>
       </div>
 
-      {/* Right: Theme toggle + Profile */}
-      <div className="flex items-center gap-2">
+      {/* Right: Notification + Theme + Profile */}
+      <div className="flex items-center gap-1 sm:gap-2">
+        <NotificationDropdown />
         <ThemeToggle />
-        <div className="h-5 w-px bg-border hidden sm:block" />
         {footerItems.map((item) => {
           const Icon = item.icon
           return (
