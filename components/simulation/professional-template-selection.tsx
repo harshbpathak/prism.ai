@@ -27,8 +27,7 @@ import { cn } from "@/lib/utils"
 import { ScenarioData } from "@/lib/context/scenario-context"
 import { ForecastScenarios } from "./forecast-scenarios"
 
-// Enhanced Glassmorphic Card Component
-function GlassmorphicCard({ 
+function MinimalCard({ 
   children, 
   className = "", 
   hover = true,
@@ -42,8 +41,8 @@ function GlassmorphicCard({
   return (
     <Card 
       className={cn(
-        "border border-white/30 dark:border-slate-700/10 bg-white/70 dark:bg-slate-950/50 backdrop-blur-xl shadow-xl shadow-black/5 dark:shadow-black/20 rounded-xl transition-all duration-300",
-        hover && "hover:shadow-2xl hover:bg-white/80 dark:hover:bg-slate-950/70 hover:scale-[1.02] cursor-pointer",
+        "border border-slate-200 dark:border-slate-800 bg-white dark:bg-black shadow-sm rounded-xl transition-all duration-300",
+        hover && "hover:shadow-md hover:border-slate-300 dark:hover:border-slate-700 hover:scale-[1.02] cursor-pointer",
         className
       )} 
       {...props}
@@ -377,171 +376,38 @@ export function ProfessionalTemplateSelection({
   }
 
   return (
-    <div className="space-y-12">
-      {/* Action Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
-        <GlassmorphicCard 
-          className="group hover:scale-105 transition-all duration-300"
-          onClick={() => {
-            const templateSection = document.getElementById('template-section')
-            if (templateSection) {
-              templateSection.scrollIntoView({ behavior: 'smooth', block: 'start' })
-            }
-          }}
-        >
-          <CardHeader className="text-center pb-6">
-            <div className="mx-auto w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform shadow-lg">
-              <FileText className="w-8 h-8 text-white" />
-            </div>
-            <CardTitle className="text-xl font-semibold">Template Gallery</CardTitle>
-            <CardDescription className="text-base">Browse curated scenarios</CardDescription>
-          </CardHeader>
-        </GlassmorphicCard>
+    <div className="space-y-10">
+      {/* Two Action Cards — AI Scenarios + Custom Scenario */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 
-        <GlassmorphicCard className="group hover:scale-105 transition-all duration-300" onClick={onAIScenarios}>
+        <MinimalCard className="group hover:scale-[1.02] transition-all duration-200" onClick={onAIScenarios}>
           <CardHeader className="text-center pb-6">
-            <div className="mx-auto w-16 h-16 bg-gradient-to-br from-purple-500 to-pink-600 rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform shadow-lg">
-              <Sparkles className="w-8 h-8 text-white" />
+            <div className="mx-auto w-14 h-14 bg-slate-100 dark:bg-slate-800 rounded-xl flex items-center justify-center mb-3 group-hover:bg-black dark:group-hover:bg-white transition-all">
+              <Sparkles className="w-6 h-6 text-black dark:text-white group-hover:text-white dark:group-hover:text-black transition-colors" />
             </div>
-            <CardTitle className="text-xl font-semibold">AI Scenarios</CardTitle>
-            <CardDescription className="text-base">Get intelligent suggestions</CardDescription>
+            <CardTitle className="text-lg font-semibold">AI Vector Generator</CardTitle>
+            <CardDescription className="text-sm text-slate-500 dark:text-slate-400">
+              Generate intelligent fault scenarios tailored to your network topology using AI.
+            </CardDescription>
           </CardHeader>
-        </GlassmorphicCard>
+        </MinimalCard>
 
-        <GlassmorphicCard className="group hover:scale-105 transition-all duration-300" onClick={onStartFromScratch}>
+        <MinimalCard className="group hover:scale-[1.02] transition-all duration-200" onClick={onStartFromScratch}>
           <CardHeader className="text-center pb-6">
-            <div className="mx-auto w-16 h-16 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform shadow-lg">
-              <Plus className="w-8 h-8 text-white" />
+            <div className="mx-auto w-14 h-14 bg-slate-100 dark:bg-slate-800 rounded-xl flex items-center justify-center mb-3 group-hover:bg-black dark:group-hover:bg-white transition-all">
+              <Plus className="w-6 h-6 text-black dark:text-white group-hover:text-white dark:group-hover:text-black transition-colors" />
             </div>
-            <CardTitle className="text-xl font-semibold">Start from Scratch</CardTitle>
-            <CardDescription className="text-base">Build a custom scenario</CardDescription>
+            <CardTitle className="text-lg font-semibold">Custom Scenario</CardTitle>
+            <CardDescription className="text-sm text-slate-500 dark:text-slate-400">
+              Define your own fault vector from scratch — choose affected nodes, severity, and cascade logic.
+            </CardDescription>
           </CardHeader>
-        </GlassmorphicCard>
+        </MinimalCard>
       </div>
 
       {/* Forecast Scenarios Section */}
-      <div className="space-y-8">
+      <div className="space-y-4">
         <ForecastScenarios onSelectScenario={onSelectScenario} />
-      </div>
-
-      {/* Recommended Templates */}
-      {groupedTemplates.recommended.length > 0 && (
-        <div className="space-y-6 py-8">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-amber-500 to-orange-600 rounded-xl flex items-center justify-center">
-              <Shield className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">
-                Recommended for You
-              </h2>
-              <p className="text-sm text-slate-600 dark:text-slate-400">
-                Most popular scenarios based on your profile
-              </p>
-            </div>
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {groupedTemplates.recommended.map((template) => (
-              <TemplateCard
-                key={template.id}
-                template={template}
-                onSelect={() => onTemplateSelect(template)}
-                getSeverityColor={getSeverityColor}
-                getComplexityColor={getComplexityColor}
-                isRecommended
-              />
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Search and Filter */}
-      <div className="space-y-6 py-8">
-        <div className="flex items-center gap-3">
-          <Search className="w-5 h-5 text-slate-600 dark:text-slate-400" />
-          <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-            Find Your Scenario
-          </h3>
-        </div>
-        
-        <div className="flex flex-col lg:flex-row gap-6">
-          <div className="relative flex-1">
-            <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-            <Input
-              placeholder="Search scenarios by name, description, or tags..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-12 pr-4 py-3 text-base bg-white/70 dark:bg-slate-900/70 backdrop-blur-sm border-white/40 dark:border-slate-700/40 rounded-xl focus:ring-2 focus:ring-blue-500/20"
-            />
-          </div>
-          
-          <Tabs value={selectedCategory} onValueChange={setSelectedCategory} className="w-full lg:w-auto">
-            <TabsList className="grid grid-cols-2 lg:grid-cols-5 bg-white/70 dark:bg-slate-900/70 backdrop-blur-sm border-white/40 dark:border-slate-700/40 p-1 rounded-xl">
-              <TabsTrigger value="all" className="rounded-lg text-sm font-medium">
-                All
-              </TabsTrigger>
-              <TabsTrigger value="high-risk" className="rounded-lg text-sm font-medium">
-                High Risk
-              </TabsTrigger>
-              <TabsTrigger value="moderate-risk" className="rounded-lg text-sm font-medium">
-                Moderate
-              </TabsTrigger>
-              <TabsTrigger value="low-risk" className="rounded-lg text-sm font-medium">
-                Low Risk
-              </TabsTrigger>
-              <TabsTrigger value="operational" className="rounded-lg text-sm font-medium">
-                Operational
-              </TabsTrigger>
-            </TabsList>
-          </Tabs>
-        </div>
-      </div>
-
-      {/* All Templates */}
-      <div className="space-y-8" id="template-section">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center">
-              <BarChart3 className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100">
-                All Scenario Templates
-              </h2>
-              <p className="text-sm text-slate-600 dark:text-slate-400">
-                Professional scenarios designed by supply chain experts
-              </p>
-            </div>
-          </div>
-          <Badge variant="outline" className="bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 px-4 py-2 text-sm font-medium">
-            {filteredTemplates.length} available
-          </Badge>
-        </div>
-
-        {filteredTemplates.length === 0 ? (
-          <div className="text-center py-16">
-            <div className="w-32 h-32 mx-auto mb-6 rounded-full bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-700 flex items-center justify-center">
-              <Search className="w-12 h-12 text-gray-400" />
-            </div>
-            <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-3">No scenarios found</h3>
-            <p className="text-gray-500 dark:text-gray-400 max-w-md mx-auto leading-relaxed">
-              Try adjusting your search terms or selecting a different risk category to find relevant scenarios.
-            </p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {filteredTemplates.map((template) => (
-              <TemplateCard
-                key={template.id}
-                template={template}
-                onSelect={() => onTemplateSelect(template)}
-                getSeverityColor={getSeverityColor}
-                getComplexityColor={getComplexityColor}
-              />
-            ))}
-          </div>
-        )}
       </div>
     </div>
   )
@@ -565,7 +431,7 @@ function TemplateCard({
   const Icon = template.icon
 
   return (
-    <GlassmorphicCard className="group relative" onClick={onSelect}>
+    <MinimalCard className="group relative" onClick={onSelect}>
       {isRecommended && (
         <div className="absolute -top-2 -right-2 z-10">
           <div className="bg-gradient-to-r from-amber-400 to-orange-500 text-white text-xs font-bold px-2 py-1 rounded-full shadow-lg">
@@ -626,6 +492,6 @@ function TemplateCard({
           )}
         </div>
       </CardContent>
-    </GlassmorphicCard>
+    </MinimalCard>
   )
 }
