@@ -91,7 +91,7 @@ export default function MainLayout({
     )
 
     return () => authData.subscription.unsubscribe()
-  }, [router])
+  }, [router, pathname])
 
   if (isLoading) {
     return (

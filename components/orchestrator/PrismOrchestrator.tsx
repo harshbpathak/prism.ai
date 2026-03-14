@@ -570,6 +570,7 @@ export default function PrismOrchestrator({
                   variant="outline" 
                   size="sm" 
                   className="w-full justify-start text-left border-border text-foreground hover:bg-muted"
+                  onClick={() => router.push(`/digital-twin${nodeId ? `?twinId=${nodeId}` : ''}`)}
                 >
                   <MapPin className="w-4 h-4 mr-2" />
                   View Digital Twin for {nodeId || 'Network'}

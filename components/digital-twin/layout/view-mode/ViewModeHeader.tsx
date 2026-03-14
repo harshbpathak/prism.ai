@@ -27,14 +27,18 @@ const ViewModeHeader: FC<ViewModeHeaderProps> = ({ title = 'Supply Chain View', 
       className={`flex items-center justify-between border-b border-border bg-card/50 backdrop-blur-sm px-4 py-2 shadow-md ${className ?? ''}`}
     >
       <div className="flex items-center gap-2">
-        <Button variant="ghost" size="icon" aria-label="Back to Dashboard" onClick={() => router.push('/digital-twin')}
-          className="rounded-full">
-          <ArrowLeft className="w-4 h-4" />
-        </Button>
-        <span className="text-sm font-semibold whitespace-nowrap">{title}</span>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => router.push('/dashboard')}
+            className="flex items-center gap-2 text-slate-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition-all duration-200"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            <span className="text-sm font-semibold whitespace-nowrap">{title}</span>
+          </Button>
       </div>
     </header>
   );
 };
 
-export default ViewModeHeader; 
+export default ViewModeHeader;

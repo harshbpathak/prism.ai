@@ -1,192 +1,88 @@
 "use client"
 
 import { TimelineSteps, LandingHeader, Footer } from "@/components/home-page"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { 
-  IconWorkflow,
-  IconArrowRight,
-  IconBarChart2,
-  IconActivity,
-} from "@/components/home-page/icons"
 import { motion } from "framer-motion"
 import { GlowyButton } from "@/components/home-page"
 import { Hero as FUIHeroWithGridSimple } from "@/components/home-page"
 import { Inter } from 'next/font/google'
+import Link from 'next/link'
+import {
+  BarChart2,
+  Activity,
+  GitBranch,
+  ArrowRight,
+  TrendingUp,
+  Target
+} from "lucide-react"
 
 const inter = Inter({
   subsets: ['latin'],
-  weight: ['400', '500', '600', '700'],
+  weight: ['400', '500', '600', '700', '800'],
   variable: '--font-inter',
   display: 'swap',
 })
 
 export default function Home() {
 
-  const globalRoutes: {
-    from: string;
-    to: string;
-    status: "active" | "delayed" | "disrupted";
-  }[] = [
-    { from: "Shanghai", to: "Los Angeles", status: "active" },
-    { from: "Rotterdam", to: "New York", status: "delayed" },
-    { from: "Singapore", to: "Sydney", status: "active" },
-    { from: "Mumbai", to: "Dubai", status: "disrupted" },
-  ]
+  const smoothScroll = (e: React.MouseEvent<HTMLAnchorElement>, targetId: string) => {
+    e.preventDefault();
+    const targetElement = document.getElementById(targetId);
+    if (!targetElement) return;
+
+    const header = document.querySelector('header');
+    const headerHeight = header ? header.offsetHeight : 0;
+    const targetPosition = targetElement.getBoundingClientRect().top + window.pageYOffset - headerHeight;
+    const startPosition = window.pageYOffset;
+    const distance = targetPosition - startPosition;
+    const duration = 1000;
+    let start: number | null = null;
+    const easeOutQuint = (t: number) => 1 - Math.pow(1 - t, 5);
+    
+    const animation = (currentTime: number) => {
+      if (start === null) start = currentTime;
+      const timeElapsed = currentTime - start;
+      const progress = Math.min(timeElapsed / duration, 1);
+      const easeProgress = easeOutQuint(progress);
+      
+      window.scrollTo({ top: startPosition + (distance * easeProgress), behavior: 'auto' });
+      
+      if (timeElapsed < duration) {
+        requestAnimationFrame(animation);
+      }
+    };
+    requestAnimationFrame(animation);
+  };
+
+  const cardBaseClasses = "bg-[rgba(255,255,255,0.65)] backdrop-blur-[20px] border border-[rgba(255,255,255,0.9)] rounded-[20px] shadow-[0_4px_24px_rgba(99,102,241,0.08),0_1px_2px_rgba(0,0,0,0.04)] hover:shadow-[0_8px_40px_rgba(37,99,235,0.12),0_2px_8px_rgba(0,0,0,0.06)] hover:-translate-y-[2px] hover:border-[rgba(37,99,235,0.2)] transition-all duration-300";
 
   return (
-    <div className={inter.className}>
+    <div className={`${inter.className} bg-[#FAFBFF] min-h-screen font-sans text-[#0F172A] selection:bg-[#2563EB]/20 selection:text-[#2563EB]`}>
+      
+      {/* 1. Navbar */}
       <LandingHeader />
-      
-      {/* Background Grid Pattern */}
-      <div className="fixed inset-0 -z-20 overflow-hidden">
-        <svg
-          className="absolute inset-0 h-full w-full stroke-gray-400/30 dark:stroke-white/3 [mask-image:radial-gradient(100%_100%_at_top_center,white,transparent)]"
-          aria-hidden="true"
-        >
-          <defs>
-            <pattern
-              id="landing-grid-pattern"
-              width={200}
-              height={200}
-              x="50%"
-              y={-1}
-              patternUnits="userSpaceOnUse"
-            >
-              <path d="M.5 200V.5H200" fill="none" />
-            </pattern>
-          </defs>
-          <svg x="50%" y={-1} className="overflow-visible fill-gray-300/20 dark:fill-gray-800/10">
-            <path
-              d="M-200 0h201v201h-201Z M600 0h201v201h-201Z M-400 600h201v201h-201Z M200 800h201v201h-201Z"
-              strokeWidth={0}
-            />
-          </svg>
-          <rect
-            width="100%"
-            height="100%"
-            strokeWidth={0}
-            fill="url(#landing-grid-pattern)"
-          />
-        </svg>
-        
-        {/* Grid Fade Out Effect Before Footer */}
-        <div className="absolute bottom-0 left-0 right-0 h-96 bg-gradient-to-t from-background via-background/95 via-background/80 via-background/60 via-background/40 via-background/20 to-transparent pointer-events-none" />
-      </div>
-      
-      <main id="top" className="flex-1 min-h-screen text-foreground flex flex-col items-center justify-center overflow-hidden relative">
-        {/* Abstract background elements with motion */}
-        <motion.div 
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 1.5 }}
-          className="fixed inset-0 -z-10 overflow-hidden"
-        >
-          <motion.div 
-            animate={{ 
-              x: [0, 50, 0],
-              y: [0, -30, 0],
-              scale: [1, 1.1, 1]
-            }}
-            transition={{ 
-              duration: 8, 
-              repeat: Infinity, 
-              ease: "easeInOut" 
-            }}
-            className="absolute top-1/4 right-1/4 w-96 h-96 rounded-full bg-blue-300 dark:bg-blue-900/30 opacity-20 blur-3xl"
-          ></motion.div>
-          <motion.div 
-            animate={{ 
-              x: [0, -40, 0],
-              y: [0, 20, 0],
-              scale: [1, 0.9, 1]
-            }}
-            transition={{ 
-              duration: 10, 
-              repeat: Infinity, 
-              ease: "easeInOut",
-              delay: 2
-            }}
-            className="absolute bottom-1/3 left-1/3 w-80 h-80 rounded-full bg-purple-300 dark:bg-purple-900/30 opacity-20 blur-3xl"
-          ></motion.div>
-          <motion.div 
-            animate={{ 
-              x: [0, 30, 0],
-              y: [0, -20, 0],
-              scale: [1, 1.2, 1]
-            }}
-            transition={{ 
-              duration: 12, 
-              repeat: Infinity, 
-              ease: "easeInOut",
-              delay: 4
-            }}
-            className="absolute top-2/3 right-1/3 w-72 h-72 rounded-full bg-indigo-300 dark:bg-indigo-900/30 opacity-20 blur-3xl"
-          ></motion.div>
-        </motion.div>
-        
-        <motion.div 
-          initial={{ opacity: 0, y: 50 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 0.3 }}
-          className="pt-16 w-full"
-        >
-          <FUIHeroWithGridSimple />
-        </motion.div>
-        
-        <motion.div 
-          initial={{ opacity: 0 }}
-          whileInView={{ opacity: 1 }}
-          transition={{ duration: 0.8 }}
-          viewport={{ once: true }}
-          id="features" 
-          className="w-full mt-20"
-        >
-          <TimelineSteps />
-        </motion.div>
 
-        {/* Animated Diagram Section with chart placeholders */}
+      <main id="top" className="flex-1 overflow-hidden relative">
+        
+        {/* 2. Hero */}
+        <FUIHeroWithGridSimple />
+        
+        {/* Alternate background layer spanning timeline & beyond */}
+        <div className="absolute top-[800px] left-0 right-0 h-[1000px] bg-[#F4F6FD] -skew-y-3 origin-top-right -z-10" />
+
+        {/* 3. How It Works */}
+        <TimelineSteps />
+
+        {/* 4. Advanced Analytics */}
         <motion.section 
           initial={{ opacity: 0 }}
           whileInView={{ opacity: 1 }}
           transition={{ duration: 1 }}
           viewport={{ once: true }}
           id="benefits"
-          className="w-full relative py-20 md:py-32 px-4 bg-gradient-to-b from-transparent via-blue-50/30 to-transparent dark:from-transparent dark:via-blue-900/5 dark:to-transparent overflow-hidden"
+          className="w-full relative py-20 md:py-32 px-4 bg-[#FAFBFF] z-10 overflow-hidden"
         >
-          <motion.div 
-            initial={{ opacity: 0 }}
-            whileInView={{ opacity: 1 }}
-            transition={{ duration: 1.5 }}
-            viewport={{ once: true }}
-            className="absolute inset-0 -z-10"
-          >
-            <motion.div 
-              animate={{ 
-                scale: [1, 1.2, 1],
-                opacity: [0.2, 0.4, 0.2]
-              }}
-              transition={{ 
-                duration: 6, 
-                repeat: Infinity, 
-                ease: "easeInOut" 
-              }}
-              className="absolute left-1/3 bottom-0 w-72 h-72 rounded-full bg-blue-300/20 dark:bg-blue-900/10 blur-3xl"
-            ></motion.div>
-            <motion.div 
-              animate={{ 
-                scale: [1, 0.8, 1],
-                opacity: [0.2, 0.3, 0.2]
-              }}
-              transition={{ 
-                duration: 8, 
-                repeat: Infinity, 
-                ease: "easeInOut",
-                delay: 3
-              }}
-              className="absolute right-1/4 top-1/3 w-64 h-64 rounded-full bg-purple-300/20 dark:bg-purple-900/10 blur-3xl"
-            ></motion.div>
-          </motion.div>
+          {/* Subtle decoration */}
+          <div className="absolute top-0 right-0 w-1/2 h-full bg-gradient-to-l from-[#F4F6FD] to-transparent -z-10 opacity-50" />
           
           <div className="max-w-6xl mx-auto">
             <motion.div
@@ -194,381 +90,245 @@ export default function Home() {
               whileInView={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.8 }}
               viewport={{ once: true }}
-              className="text-center mb-16"
+              className="text-center mb-20"
             >
-              <motion.div 
-                initial={{ opacity: 0, scale: 0.8 }}
-                whileInView={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.6, delay: 0.2 }}
-                viewport={{ once: true }}
-                className="inline-block mb-3"
-              >
-                <Badge variant="blue" className="uppercase tracking-wide">
-                  Advanced Analytics
-                </Badge>
-              </motion.div>
-              <motion.h2 
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.8, delay: 0.4 }}
-                viewport={{ once: true }}
-                className="text-4xl md:text-5xl font-bold mb-6 text-blue-700 dark:text-blue-400"
-              >
-                Supply Chain Resilience in Action
-              </motion.h2>
-              <motion.p 
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.8, delay: 0.6 }}
-                viewport={{ once: true }}
-                className="font-mono text-slate-600 dark:text-slate-300 max-w-2xl mx-auto text-lg leading-relaxed"
-              >
+              <div className="inline-flex items-center justify-center px-4 py-1.5 mb-6 rounded-full bg-[rgba(37,99,235,0.08)] border border-[rgba(37,99,235,0.2)]">
+                <span className="text-[#2563EB] text-[11px] font-[600] uppercase tracking-[0.12em]">
+                  ADVANCED ANALYTICS
+                </span>
+              </div>
+              
+              <h2 className="text-[44px] md:text-[48px] font-[700] tracking-[-0.02em] text-[#0F172A] mb-6 leading-tight">
+                Supply Chain Resilience <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#2563EB] to-[#7C3AED]">in Action</span>
+              </h2>
+              
+              <p className="text-[18px] md:text-[20px] font-[400] text-[#64748B] leading-[1.7] max-w-2xl mx-auto">
                 Powerful analytics and visualization tools to help you make data-driven decisions.
-              </motion.p>
+              </p>
             </motion.div>
             
-
-                        {/* Analytics Journey */}
-              <div className="relative max-w-5xl mx-auto px-4">
-                {/* Central Flow Line */}
-                <div className="absolute left-1/2 top-0 bottom-0 w-0.5 bg-gradient-to-b from-blue-500/20 via-purple-500/20 to-green-500/20 dark:from-blue-400/30 dark:via-purple-400/30 dark:to-green-400/30" />
-                
-                {/* Data Collection Stage */}
-                <motion.div
-                  initial={{ opacity: 0, x: -50 }}
-                  whileInView={{ opacity: 1, x: 0 }}
-                  transition={{ duration: 0.6 }}
-                  viewport={{ once: true }}
-                  className="relative pl-8 md:pl-0 md:pr-[calc(50%+2rem)] mb-16"
-                >
-                  <div className="absolute left-0 md:left-[calc(50%-1.5rem)] top-0 w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900/30 border-2 border-blue-500 dark:border-blue-400" />
-                  <Card className="relative dark:bg-slate-950 shadow-md">
-                    <CardHeader className="pb-4">
-                      <CardTitle className="flex items-center gap-2 text-lg text-blue-600 dark:text-blue-400">
-                        <IconBarChart2 className="h-5 w-5" />
-                        Real-Time Data Collection
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="grid grid-cols-3 gap-4">
-                        <motion.div 
-                          className="text-center"
-                          initial={{ scale: 0.8, opacity: 0 }}
-                          whileInView={{ scale: 1, opacity: 1 }}
-                          transition={{ delay: 0.2 }}
-                          viewport={{ once: true }}
-                        >
-                          <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">500+</div>
-                          <div className="text-sm text-slate-600 dark:text-slate-400">Sensors</div>
-                        </motion.div>
-                        <motion.div 
-                          className="text-center"
-                          initial={{ scale: 0.8, opacity: 0 }}
-                          whileInView={{ scale: 1, opacity: 1 }}
-                          transition={{ delay: 0.3 }}
-                          viewport={{ once: true }}
-                        >
-                          <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">24/7</div>
-                          <div className="text-sm text-slate-600 dark:text-slate-400">Monitoring</div>
-                        </motion.div>
-                        <motion.div 
-                          className="text-center"
-                          initial={{ scale: 0.8, opacity: 0 }}
-                          whileInView={{ scale: 1, opacity: 1 }}
-                          transition={{ delay: 0.4 }}
-                          viewport={{ once: true }}
-                        >
-                          <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">1ms</div>
-                          <div className="text-sm text-slate-600 dark:text-slate-400">Latency</div>
-                        </motion.div>
+            {/* Analytics Journey */}
+            <div className="relative max-w-5xl mx-auto px-4 md:px-0">
+              
+              {/* Central Flow Line */}
+              <div className="hidden md:block absolute left-1/2 top-10 bottom-10 w-[1px] bg-[rgba(0,0,0,0.06)] transform -translate-x-1/2" />
+              
+              {/* Data Collection Stage */}
+              <motion.div
+                initial={{ opacity: 0, x: -50 }}
+                whileInView={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.6 }}
+                viewport={{ once: true }}
+                className="relative md:w-1/2 md:pr-12 mb-16 md:ml-0 group"
+              >
+                <div className="hidden md:block absolute right-[-28px] top-6 w-[12px] h-[12px] rounded-full bg-[#2563EB] ring-4 ring-[#2563EB]/10 z-10 transition-transform group-hover:scale-150" />
+                <div className={cardBaseClasses}>
+                  <div className="p-8">
+                    <div className="flex items-center gap-4 mb-6">
+                      <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-br from-[rgba(37,99,235,0.1)] to-[rgba(124,58,237,0.1)] border border-[rgba(37,99,235,0.15)] shadow-[0_2px_12px_rgba(37,99,235,0.1)]">
+                        <BarChart2 className="w-5 h-5 text-[#2563EB]" />
                       </div>
-                    </CardContent>
-                  </Card>
-                </motion.div>
+                      <h3 className="text-[18px] font-[600] text-[#0F172A]">Real-Time Data Collection</h3>
+                    </div>
+                    
+                    <div className="grid grid-cols-3 gap-4">
+                      <div className="text-center bg-white/40 rounded-xl py-3 border border-white/60">
+                        <div className="text-[28px] font-[700] text-[#0F172A] tracking-tight">500<span className="text-[#2563EB]">+</span></div>
+                        <div className="text-[11px] font-[600] text-[#64748B] uppercase tracking-[0.05em]">Sensors</div>
+                      </div>
+                      <div className="text-center bg-white/40 rounded-xl py-3 border border-white/60">
+                        <div className="text-[28px] font-[700] text-[#0F172A] tracking-tight">24/7</div>
+                        <div className="text-[11px] font-[600] text-[#64748B] uppercase tracking-[0.05em]">Monitoring</div>
+                      </div>
+                      <div className="text-center bg-white/40 rounded-xl py-3 border border-white/60">
+                        <div className="text-[28px] font-[700] text-[#0F172A] tracking-tight">1<span className="text-[18px] text-[#64748B] font-normal">ms</span></div>
+                        <div className="text-[11px] font-[600] text-[#64748B] uppercase tracking-[0.05em]">Latency</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
 
-                {/* Analysis Stage */}
-                <motion.div
-                  initial={{ opacity: 0, x: 50 }}
-                  whileInView={{ opacity: 1, x: 0 }}
-                  transition={{ duration: 0.6 }}
-                  viewport={{ once: true }}
-                  className="relative pl-8 md:pl-[calc(50%+2rem)] mb-16"
-                >
-                  <div className="absolute left-0 md:left-[calc(50%-1.5rem)] top-0 w-6 h-6 rounded-full bg-purple-100 dark:bg-purple-900/30 border-2 border-purple-500 dark:border-purple-400" />
-                  <Card className="relative dark:bg-slate-950 shadow-md">
-                    <CardHeader className="pb-4">
-                      <CardTitle className="flex items-center gap-2 text-lg text-purple-600 dark:text-purple-400">
-                        <IconActivity className="h-5 w-5" />
-                        Intelligent Analysis
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-4">
-                        <div className="flex items-center gap-4">
-                          <div className="w-1/3 text-sm text-slate-600 dark:text-slate-400">Risk Detection</div>
-                          <div className="flex-1 h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                            <motion.div 
-                              className="h-full bg-purple-500 dark:bg-purple-400 rounded-full"
-                              initial={{ width: 0 }}
-                              whileInView={{ width: "98.5%" }}
-                              transition={{ duration: 1 }}
-                              viewport={{ once: true }}
-                            />
-                          </div>
-                          <div className="w-16 text-sm font-medium text-purple-600 dark:text-purple-400">98.5%</div>
+              {/* Analysis Stage */}
+              <motion.div
+                initial={{ opacity: 0, x: 50 }}
+                whileInView={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.6 }}
+                viewport={{ once: true }}
+                className="relative md:w-1/2 md:pl-12 mb-16 md:ml-auto group"
+              >
+                <div className="hidden md:block absolute left-[-28px] top-6 w-[12px] h-[12px] rounded-full bg-[#7C3AED] ring-4 ring-[#7C3AED]/10 z-10 transition-transform group-hover:scale-150" />
+                <div className={cardBaseClasses}>
+                  <div className="p-8">
+                    <div className="flex items-center gap-4 mb-8">
+                      <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-br from-[rgba(124,58,237,0.1)] to-[rgba(37,99,235,0.1)] border border-[rgba(124,58,237,0.15)] shadow-[0_2px_12px_rgba(124,58,237,0.1)]">
+                        <Activity className="w-5 h-5 text-[#7C3AED]" />
+                      </div>
+                      <h3 className="text-[18px] font-[600] text-[#0F172A]">Intelligent Analysis</h3>
+                    </div>
+                    
+                    <div className="space-y-6">
+                      <div>
+                        <div className="flex justify-between mb-2">
+                          <span className="text-[14px] font-[500] text-[#0F172A]">Risk Detection Rate</span>
+                          <span className="text-[14px] font-[600] text-[#7C3AED]">98.5%</span>
                         </div>
-                        <div className="flex items-center gap-4">
-                          <div className="w-1/3 text-sm text-slate-600 dark:text-slate-400">Prediction Accuracy</div>
-                          <div className="flex-1 h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                            <motion.div 
-                              className="h-full bg-purple-500 dark:bg-purple-400 rounded-full"
-                              initial={{ width: 0 }}
-                              whileInView={{ width: "94.2%" }}
-                              transition={{ duration: 1, delay: 0.2 }}
-                              viewport={{ once: true }}
-                            />
-                          </div>
-                          <div className="w-16 text-sm font-medium text-purple-600 dark:text-purple-400">94.2%</div>
+                        <div className="h-2 w-full bg-[rgba(37,99,235,0.08)] rounded-full overflow-hidden">
+                          <motion.div 
+                            className="h-full bg-gradient-to-r from-[#2563EB] to-[#7C3AED] rounded-full"
+                            style={{ backgroundImage: 'linear-gradient(90deg, #2563EB, #7C3AED)' }}
+                            initial={{ width: 0 }}
+                            whileInView={{ width: "98.5%" }}
+                            transition={{ duration: 1.5, ease: "easeOut" }}
+                            viewport={{ once: true }}
+                          />
                         </div>
                       </div>
-                    </CardContent>
-                  </Card>
-                </motion.div>
 
-                {/* Optimization Stage */}
-                <motion.div
-                  initial={{ opacity: 0, x: -50 }}
-                  whileInView={{ opacity: 1, x: 0 }}
-                  transition={{ duration: 0.6 }}
-                  viewport={{ once: true }}
-                  className="relative pl-8 md:pl-0 md:pr-[calc(50%+2rem)]"
-                >
-                  <div className="absolute left-0 md:left-[calc(50%-1.5rem)] top-0 w-6 h-6 rounded-full bg-green-100 dark:bg-green-900/30 border-2 border-green-500 dark:border-green-400" />
-                  <Card className="relative dark:bg-slate-950 shadow-md">
-                    <CardHeader className="pb-4">
-                      <CardTitle className="flex items-center gap-2 text-lg text-green-600 dark:text-green-400">
-                        <IconWorkflow className="h-5 w-5" />
-                        Continuous Optimization
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="grid grid-cols-2 gap-4">
-                        <motion.div 
-                          className="p-3 rounded-lg bg-green-50 dark:bg-green-900/20"
-                          initial={{ scale: 0.9, opacity: 0 }}
-                          whileInView={{ scale: 1, opacity: 1 }}
-                          transition={{ delay: 0.2 }}
-                          viewport={{ once: true }}
-                        >
-                          <div className="text-xl font-bold text-green-600 dark:text-green-400">32%</div>
-                          <div className="text-sm text-green-600/70 dark:text-green-400/70">Cost Reduction</div>
-                        </motion.div>
-                        <motion.div 
-                          className="p-3 rounded-lg bg-green-50 dark:bg-green-900/20"
-                          initial={{ scale: 0.9, opacity: 0 }}
-                          whileInView={{ scale: 1, opacity: 1 }}
-                          transition={{ delay: 0.3 }}
-                          viewport={{ once: true }}
-                        >
-                          <div className="text-xl font-bold text-green-600 dark:text-green-400">45%</div>
-                          <div className="text-sm text-green-600/70 dark:text-green-400/70">Faster Delivery</div>
-                        </motion.div>
+                      <div>
+                        <div className="flex justify-between mb-2">
+                          <span className="text-[14px] font-[500] text-[#0F172A]">Prediction Accuracy</span>
+                          <span className="text-[14px] font-[600] text-[#7C3AED]">94.2%</span>
+                        </div>
+                        <div className="h-2 w-full bg-[rgba(37,99,235,0.08)] rounded-full overflow-hidden">
+                          <motion.div 
+                            className="h-full bg-gradient-to-r from-[#2563EB] to-[#7C3AED] rounded-full"
+                            style={{ backgroundImage: 'linear-gradient(90deg, #2563EB, #7C3AED)' }}
+                            initial={{ width: 0 }}
+                            whileInView={{ width: "94.2%" }}
+                            transition={{ duration: 1.5, delay: 0.2, ease: "easeOut" }}
+                            viewport={{ once: true }}
+                          />
+                        </div>
                       </div>
-                    </CardContent>
-                  </Card>
-                </motion.div>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
 
-                {/* CTA Button */}
-                <motion.div 
-                  initial={{ opacity: 0, y: 20 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.6, delay: 0.4 }}
-                  viewport={{ once: true }}
-                  className="text-center mt-12"
-                >
-                  <a href="/analytics" className="btn-donate">
-                    <span>Explore Analytics Dashboard</span>
-                    <IconArrowRight className="h-4 w-4" />
-                  </a>
-                </motion.div>
-              </div>
+              {/* Optimization Stage */}
+              <motion.div
+                initial={{ opacity: 0, x: -50 }}
+                whileInView={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.6 }}
+                viewport={{ once: true }}
+                className="relative md:w-1/2 md:pr-12 group"
+              >
+                <div className="hidden md:block absolute right-[-28px] top-6 w-[12px] h-[12px] rounded-full bg-[#10B981] ring-4 ring-[#10B981]/10 z-10 transition-transform group-hover:scale-150" />
+                <div className={cardBaseClasses}>
+                  <div className="p-8">
+                    <div className="flex items-center gap-4 mb-6">
+                      <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-br from-[rgba(16,185,129,0.1)] to-[rgba(37,99,235,0.1)] border border-[rgba(16,185,129,0.15)] shadow-[0_2px_12px_rgba(16,185,129,0.1)]">
+                        <TrendingUp className="w-5 h-5 text-[#10B981]" />
+                      </div>
+                      <h3 className="text-[18px] font-[600] text-[#0F172A]">Continuous Optimization</h3>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="bg-white/40 border border-white/60 rounded-xl p-4 text-center">
+                        <div className="text-[32px] font-[700] text-[#10B981] tracking-tight mb-1">32%</div>
+                        <div className="text-[13px] font-[500] text-[#64748B] leading-tight">Average Cost<br/>Reduction</div>
+                      </div>
+                      <div className="bg-white/40 border border-white/60 rounded-xl p-4 text-center">
+                        <div className="text-[32px] font-[700] text-[#10B981] tracking-tight mb-1">45%</div>
+                        <div className="text-[13px] font-[500] text-[#64748B] leading-tight">Faster Delivery<br/>Times</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+              
             </div>
-          </motion.section>
+          </div>
+        </motion.section>
         
+        {/* 5. Stats / Metrics bar */}
+        {/* Metrics are integrated above gracefully. No separate bar required for 3-part layout. */}
+
+        {/* 6. Final CTA section */}
         <motion.section 
           initial={{ opacity: 0, y: 50 }}
           whileInView={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8 }}
           viewport={{ once: true }}
-          id="contact"
-          className="w-full relative py-20 md:py-32"
+          id="features"
+          className="w-full relative py-20 px-4 mb-20 z-10"
         >
-          <div className="absolute inset-0 bg-gradient-to-b from-transparent to-blue-50/50 dark:from-transparent dark:to-blue-950/10 -z-10"></div>
-          <div className="absolute inset-0 overflow-hidden -z-10">
-            <svg className="absolute bottom-0 left-0 w-full h-1/3 text-blue-100/50 dark:text-blue-900/20 translate-y-1/4" 
-                xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 120" preserveAspectRatio="none">
-              <path d="M321.39,56.44c58-10.79,114.16-30.13,172-41.86,82.39-16.72,168.19-17.73,250.45-.39C823.78,31,906.67,72,985.66,92.83c70.05,18.48,146.53,26.09,214.34,3V0H0V27.35A600.21,600.21,0,0,0,321.39,56.44Z" 
-                    fill="currentColor"></path>
-            </svg>
-          </div>
-          
-          <div className="container mx-auto px-4 max-w-6xl relative">
-            <div className="bg-[#5B21FF] rounded-3xl shadow-2xl p-6 md:p-12 relative overflow-hidden">
-              {/* Gradient Overlay */}
-              <div className="absolute inset-0 bg-gradient-to-br from-purple-600/50 via-[#5B21FF] to-indigo-600/50"></div>
-              {/* Dots Pattern */}
-              <div className="absolute inset-0" style={{
-                backgroundImage: `radial-gradient(circle at 1px 1px, rgba(255, 255, 255, 0.15) 1px, transparent 0)`,
-                backgroundSize: '20px 20px'
-              }}></div>
+          <div className="max-w-5xl mx-auto">
+            <div className="relative rounded-[32px] overflow-hidden bg-gradient-to-br from-[#1E293B] to-[#0F172A] p-10 md:p-16 shadow-2xl">
               
-              {/* Content */}
-              <div className="relative z-10 grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-12 items-center">
-                <motion.div
-                  initial={{ opacity: 0, x: -30 }}
-                  whileInView={{ opacity: 1, x: 0 }}
-                  transition={{ duration: 0.6, delay: 0.2 }}
-                  viewport={{ once: true }}
-                >
-                  <Badge variant="outline" className="mb-4 bg-white/10 text-white border-white/20 uppercase tracking-wide text-xs font-medium">
-                    Start Today
-                  </Badge>
-                  <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold mb-6 text-white leading-tight">
+              {/* Decorative elements inside CTA card */}
+              <div className="absolute top-0 right-0 p-12 opacity-10 pointer-events-none">
+                <Target className="w-[300px] h-[300px] text-white transform rotate-12" />
+              </div>
+              <div className="absolute -left-20 -bottom-20 w-64 h-64 bg-[#2563EB] rounded-full blur-[100px] opacity-40 mix-blend-screen" />
+              <div className="absolute -right-20 -top-20 w-64 h-64 bg-[#7C3AED] rounded-full blur-[100px] opacity-40 mix-blend-screen" />
+
+              <div className="relative z-10 grid md:grid-cols-2 gap-12 items-center">
+                <div>
+                  <div className="inline-flex items-center justify-center px-4 py-1.5 mb-6 rounded-full bg-white/10 border border-white/20">
+                    <span className="text-white text-[11px] font-[600] uppercase tracking-[0.12em]">
+                      START TODAY
+                    </span>
+                  </div>
+                  
+                  <h2 className="text-[36px] md:text-[42px] font-[700] tracking-[-0.02em] text-white leading-tight mb-6">
                     Ready to Transform Your Supply Chain?
                   </h2>
-                  <p className="text-gray-200 mb-8 text-base md:text-lg leading-relaxed">
+                  
+                  <p className="text-[16px] md:text-[18px] text-[#94A3B8] leading-[1.7] mb-10 max-w-lg">
                     Experience the power of AI-driven supply chain resilience. Join industry leaders already using our platform to navigate disruptions with confidence.
                   </p>
                   
-                  {/* Action Buttons */}
                   <div className="flex flex-col sm:flex-row gap-4">
-                    <GlowyButton 
-                      href="/signin" 
-                      className="bg-white hover:bg-gray-50 text-[#5B21FF] shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 group justify-center"
+                    <Link
+                      href="/dashboard"
+                      className="inline-flex items-center justify-center font-medium rounded-xl transition-all duration-300 px-8 py-3.5 text-[#0F172A] bg-white shadow-[0_4px_24px_rgba(255,255,255,0.2)] hover:shadow-[0_8px_40px_rgba(255,255,255,0.3)] hover:-translate-y-[2px]"
                     >
-                      <span className="font-medium">Get Started</span>
-                      <IconArrowRight className="h-4 w-4 transform transition-transform duration-300 group-hover:translate-x-1" />
-                    </GlowyButton>
-                    
-                    <GlowyButton 
+                      <span className="flex items-center gap-2">
+                        Get Started
+                        <ArrowRight className="w-5 h-5 text-[#2563EB]" />
+                      </span>
+                    </Link>
+                    <a
                       href="#features" 
-                      className="bg-transparent hover:bg-white/10 text-white border border-white/30 hover:border-white/50 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 justify-center"
+                      onClick={(e) => smoothScroll(e, 'features')}
+                      className="inline-flex items-center justify-center font-medium rounded-xl transition-all duration-300 px-8 py-3.5 text-white bg-white/10 border border-white/20 hover:bg-white/20 hover:-translate-y-[2px]"
                     >
-                      <span className="font-medium">Learn More</span>
-                    </GlowyButton>
+                      Learn More
+                    </a>
                   </div>
-                </motion.div>
-                
-                {/* Visual Element */}
-                <motion.div 
-                  className="relative order-first md:order-last"
-                  initial={{ opacity: 0, x: 30 }}
-                  whileInView={{ opacity: 1, x: 0 }}
-                  transition={{ duration: 0.6, delay: 0.4 }}
-                  viewport={{ once: true }}
-                >
-                  <div className="aspect-square max-w-sm mx-auto relative">
-                    {/* Animated Background Ring */}
-                    <motion.div 
-                      className="absolute inset-0 bg-white/5 rounded-3xl"
-                      animate={{ 
-                        scale: [1, 1.05, 1],
-                        opacity: [0.5, 0.8, 0.5]
-                      }}
-                      transition={{ 
-                        duration: 4, 
-                        repeat: Infinity, 
-                        ease: "easeInOut" 
-                      }}
-                    />
-                    
-                    {/* Main Content Card */}
-                    <div className="absolute inset-4 flex items-center justify-center">
-                      <motion.div 
-                        className="w-full h-full rounded-2xl overflow-hidden bg-white/10 border border-white/20 backdrop-blur-sm flex items-center justify-center"
-                        whileHover={{ scale: 1.02 }}
-                        transition={{ duration: 0.3 }}
-                      >
-                        <div className="text-center p-6">
-                          <motion.div 
-                            className="relative mb-6"
-                            animate={{ 
-                              y: [0, -5, 0],
-                            }}
-                            transition={{ 
-                              duration: 3, 
-                              repeat: Infinity, 
-                              ease: "easeInOut" 
-                            }}
-                          >
-                            <div className="absolute -inset-4 bg-white/10 rounded-full blur-xl"></div>
-                            <div className="h-16 w-16 mx-auto rounded-full bg-white/10 flex items-center justify-center relative backdrop-blur-sm border border-white/20">
-                              <IconWorkflow className="h-8 w-8 text-white" />
-                            </div>
-                            
-                            {/* Floating Icons */}
-                            <motion.div 
-                              className="absolute -top-2 -right-2 w-6 h-6 bg-green-400/80 rounded-full flex items-center justify-center"
-                              animate={{ 
-                                scale: [1, 1.2, 1],
-                                opacity: [0.7, 1, 0.7]
-                              }}
-                              transition={{ 
-                                duration: 2, 
-                                repeat: Infinity, 
-                                ease: "easeInOut",
-                                delay: 0.5
-                              }}
-                            >
-                              <div className="w-2 h-2 bg-white rounded-full" />
-                            </motion.div>
-                            
-                            <motion.div 
-                              className="absolute -bottom-1 -left-1 w-4 h-4 bg-blue-400/80 rounded-full flex items-center justify-center"
-                              animate={{ 
-                                scale: [1, 1.3, 1],
-                                opacity: [0.6, 1, 0.6]
-                              }}
-                              transition={{ 
-                                duration: 2.5, 
-                                repeat: Infinity, 
-                                ease: "easeInOut",
-                                delay: 1
-                              }}
-                            >
-                              <div className="w-1.5 h-1.5 bg-white rounded-full" />
-                            </motion.div>
-                          </motion.div>
-                          
-                          <h3 className="text-lg md:text-xl font-semibold text-white mb-2">
-                            Resilient Supply Chains
-                          </h3>
-                          <p className="text-gray-200 text-sm leading-relaxed">
-                            AI-powered optimization and predictive risk management
-                          </p>
-                          
-                          {/* Stats */}
-                          <div className="grid grid-cols-2 gap-4 mt-6 pt-4 border-t border-white/20">
-                            <div className="text-center">
-                              <div className="text-lg font-bold text-white">99.9%</div>
-                              <div className="text-xs text-gray-300">Uptime</div>
-                            </div>
-                            <div className="text-center">
-                              <div className="text-lg font-bold text-white">24/7</div>
-                              <div className="text-xs text-gray-300">Support</div>
-                            </div>
-                          </div>
-                        </div>
-                      </motion.div>
+                </div>
+
+                <div className="hidden md:flex justify-end">
+                  {/* Decorative Glass Component inside CTA */}
+                  <div className="w-[280px] h-[320px] rounded-[24px] bg-white/5 border border-white/10 backdrop-blur-xl p-6 relative shadow-[0_8px_40px_rgba(0,0,0,0.5)] flex flex-col items-center justify-center text-center transform rotate-3 hover:rotate-0 transition-transform duration-500">
+                    <div className="w-16 h-16 rounded-full bg-gradient-to-br from-[#2563EB] to-[#7C3AED] flex items-center justify-center mb-6 shadow-lg">
+                      <GitBranch className="w-8 h-8 text-white" />
+                    </div>
+                    <h3 className="text-white font-[600] text-[20px] mb-2">Resilient Systems</h3>
+                    <p className="text-[#94A3B8] text-[14px] leading-relaxed mb-6">
+                      AI-powered optimization and predictive risk management.
+                    </p>
+                    <div className="w-full grid grid-cols-2 gap-4 border-t border-white/10 pt-6">
+                      <div>
+                        <div className="text-white font-[700] text-[20px]">99.9%</div>
+                        <div className="text-[#94A3B8] text-[12px] uppercase tracking-wide mt-1">Uptime</div>
+                      </div>
+                      <div>
+                        <div className="text-white font-[700] text-[20px]">24/7</div>
+                        <div className="text-[#94A3B8] text-[12px] uppercase tracking-wide mt-1">Support</div>
+                      </div>
                     </div>
                   </div>
-                </motion.div>
+                </div>
               </div>
             </div>
           </div>
         </motion.section>
       </main>
       
+      {/* 7. Footer */}
       <Footer />
     </div>
   )

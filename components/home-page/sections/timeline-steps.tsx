@@ -1,167 +1,178 @@
-"use client";
-import { motion } from "framer-motion";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import AnimatedFeatureCard from "./animated-feature-card";
-import { 
-  IconSquareStack,
-  IconWaves,
-  IconTrendingUp,
-  IconTarget,
-  IconArrowRight,
-  IconSparkles
-} from "../icons";
+'use client';
 
-const TIMELINE_STEPS = [
-  {
-    title: "Build Digital Twin",
-    description: "Map your supply chain with an interactive drag-and-drop editor.",
-    color: "from-blue-600 to-blue-400",
-    icon: IconSquareStack,
-    features: ["Interactive Mapping", "Real-time Visualization"],
-  },
-  {
-    title: "Simulate Disruption",
-    description: "Run AI-powered scenarios for natural disasters, supplier failures, and more.",
-    color: "from-rose-500 to-pink-400",
-    icon: IconWaves,
-    features: ["AI Scenarios", "Multi-Risk Analysis"],
-  },
-  {
-    title: "Assess Impact",
-    description: "Visualize cost, delay, and inventory effects in real time.",
-    color: "from-violet-600 to-indigo-400",
-    icon: IconTrendingUp,
-    features: ["Real-time Analytics", "Cost Modeling"],
-  },
-  {
-    title: "Get Recommendations",
-    description: "Receive smart, cost-effective mitigation strategies and ROI analysis.",
-    color: "from-amber-500 to-yellow-400",
-    icon: IconTarget,
-    features: ["Smart Strategies", "ROI Analysis"],
-  },
-];
+import { motion } from "framer-motion";
+import { GitBranch, Zap, BarChart2, ArrowRight } from "lucide-react";
+import { GlowyButton } from "../components/GlowyButton";
 
 export function TimelineSteps() {
-  return (
-    <section className="w-full max-w-7xl mx-auto py-20 md:py-32 px-4 relative overflow-hidden">
-      {/* Enhanced Background Elements */}
-      <div className="absolute inset-0 -z-10">
-        {/* Primary gradient */}
-        <div className="absolute inset-0 bg-gradient-to-br from-blue-50/30 via-indigo-50/20 to-purple-50/30 dark:from-blue-900/10 dark:via-indigo-900/5 dark:to-purple-900/10" />
-        
-        {/* Floating gradient orbs */}
-        <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-gradient-to-br from-blue-400/10 to-indigo-400/10 rounded-full blur-3xl animate-pulse" style={{ animationDuration: '8s' }} />
-        <div className="absolute bottom-1/4 right-1/4 w-48 h-48 bg-gradient-to-br from-purple-400/10 to-pink-400/10 rounded-full blur-2xl animate-pulse" style={{ animationDuration: '6s', animationDelay: '2s' }} />
-        
-        {/* Geometric elements */}
-        <div className="absolute top-10 right-10 w-6 h-6 border border-blue-300/30 dark:border-blue-700/30 rotate-45 animate-bounce" style={{ animationDuration: '3s' }} />
-        <div className="absolute bottom-20 left-20 w-4 h-4 bg-gradient-to-br from-indigo-400/20 to-purple-400/20 rounded-full animate-pulse" style={{ animationDuration: '4s' }} />
-      </div>
 
+  const smoothScroll = (e: React.MouseEvent<HTMLAnchorElement>, targetId: string) => {
+    e.preventDefault();
+    const targetElement = document.getElementById(targetId);
+    if (!targetElement) return;
+
+    const header = document.querySelector('header');
+    const headerHeight = header ? header.offsetHeight : 0;
+    const targetPosition = targetElement.getBoundingClientRect().top + window.pageYOffset - headerHeight;
+    const startPosition = window.pageYOffset;
+    const distance = targetPosition - startPosition;
+    const duration = 1000;
+    let start: number | null = null;
+    const easeOutQuint = (t: number) => 1 - Math.pow(1 - t, 5);
+    
+    const animation = (currentTime: number) => {
+      if (start === null) start = currentTime;
+      const timeElapsed = currentTime - start;
+      const progress = Math.min(timeElapsed / duration, 1);
+      const easeProgress = easeOutQuint(progress);
+      window.scrollTo({ top: startPosition + (distance * easeProgress), behavior: 'auto' });
+      if (timeElapsed < duration) requestAnimationFrame(animation);
+    };
+    requestAnimationFrame(animation);
+  };
+
+  const cardBaseClasses = "bg-[rgba(255,255,255,0.65)] backdrop-blur-[20px] border border-[rgba(255,255,255,0.9)] rounded-[20px] shadow-[0_4px_24px_rgba(99,102,241,0.08),0_1px_2px_rgba(0,0,0,0.04)] hover:shadow-[0_8px_40px_rgba(37,99,235,0.12),0_2px_8px_rgba(0,0,0,0.06)] hover:-translate-y-0.5 hover:border-[rgba(37,99,235,0.2)] transition-all duration-300 p-8 flex flex-col";
+  
+  const iconBaseClasses = "w-14 h-14 rounded-2xl flex items-center justify-center mb-6 bg-gradient-to-br from-[rgba(37,99,235,0.1)] to-[rgba(124,58,237,0.1)] border border-[rgba(37,99,235,0.15)] shadow-[0_2px_12px_rgba(37,99,235,0.1)]";
+
+  return (
+    <section id="how-it-works" className="w-full max-w-7xl mx-auto py-20 px-4 sm:px-6 lg:px-8 relative overflow-hidden bg-[#FAFBFF]">
+      
       {/* Header Section */}
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         whileInView={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6 }}
+        transition={{ duration: 0.8 }}
         viewport={{ once: true }}
         className="text-center mb-16"
       >
-        <div className="inline-block mb-4 px-4 py-2 rounded-full bg-gradient-to-r from-blue-100/80 via-indigo-100/60 to-purple-100/80 dark:from-blue-900/30 dark:via-indigo-900/20 dark:to-purple-900/30 backdrop-blur-sm border border-blue-200/30 dark:border-blue-800/30">
-          <span className="text-blue-700 dark:text-blue-300 text-sm font-medium uppercase tracking-wide flex items-center gap-2">
-            <IconSparkles className="h-4 w-4" />
-            How It Works
+        <div className="inline-flex items-center justify-center px-4 py-1.5 mb-6 rounded-full bg-[rgba(37,99,235,0.08)] border border-[rgba(37,99,235,0.2)]">
+          <span className="text-[#2563EB] text-[11px] font-[600] uppercase tracking-[0.12em]">
+            HOW IT WORKS
           </span>
         </div>
         
-        <h2 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 bg-gradient-to-r from-blue-700 via-indigo-600 to-violet-700 dark:from-blue-400 dark:via-indigo-400 dark:to-violet-400 bg-clip-text text-transparent leading-tight">
-          AI-Powered Supply Chain Intelligence
+        <h2 className="text-[44px] md:text-[48px] font-[700] tracking-[-0.02em] text-[#0F172A] mb-6 leading-tight">
+          <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#2563EB] to-[#7C3AED]">
+            AI-Powered
+          </span> Supply Chain Intelligence
         </h2>
         
-        <p className="font-mono text-slate-600 dark:text-slate-300 max-w-3xl mx-auto text-lg md:text-xl leading-relaxed">
-          Transform disruptions into opportunities with our comprehensive four-step process that combines AI intelligence with real-world supply chain expertise.
+        <p className="text-[18px] md:text-[20px] font-[400] text-[#64748B] leading-[1.7] max-w-3xl mx-auto">
+          Transform disruptions into opportunities with our comprehensive process that combines AI intelligence with real-world supply chain expertise.
         </p>
       </motion.div>
 
-      {/* Timeline Steps */}
-      <div className="relative">
-        {/* Connecting line for desktop */}
-        <div className="hidden lg:block absolute top-1/2 left-0 right-0 h-0.5 bg-gradient-to-r from-blue-200 via-indigo-200 via-violet-200 to-amber-200 dark:from-blue-800 dark:via-indigo-800 dark:via-violet-800 dark:to-amber-800 transform -translate-y-1/2 z-0" />
+      {/* Bento Grid */}
+      <div className="grid lg:grid-cols-3 gap-6 mb-16">
         
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-6">
-          {TIMELINE_STEPS.map((step, idx) => {
-            return (
-              <motion.div
-                key={step.title}
-                initial={{ opacity: 0, y: 50 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6, delay: idx * 0.15 }}
-                viewport={{ once: true }}
-                className="relative z-10 flex flex-col items-center"
-              >
-                <AnimatedFeatureCard
-                  title={step.title}
-                  description={step.description}
-                  stepIndex={idx}
-                  className="w-full max-w-sm mx-auto"
-                />
-              </motion.div>
-            );
-          })}
+        {/* Left 3 Cards Container */}
+        <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-6">
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.1 }}
+            viewport={{ once: true }}
+            className={`${cardBaseClasses} sm:col-span-2`}
+          >
+            <div className={iconBaseClasses}>
+              <GitBranch className="w-6 h-6 text-[#2563EB]" />
+            </div>
+            <h3 className="text-[16px] font-[600] text-[#0F172A] mb-3">Digital Twin Mapping</h3>
+            <p className="text-[14px] font-[400] text-[#64748B] leading-relaxed">
+              Build interactive supply chain networks with comprehensive visibility into every tier of your supplier ecosystem. Pinpoint vulnerabilities before they manifest into critical bottlenecks.
+            </p>
+          </motion.div>
+
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.2 }}
+            viewport={{ once: true }}
+            className={cardBaseClasses}
+          >
+            <div className={iconBaseClasses}>
+              <Zap className="w-6 h-6 text-[#2563EB]" />
+            </div>
+            <h3 className="text-[16px] font-[600] text-[#0F172A] mb-3">Disruption Simulation</h3>
+            <p className="text-[14px] font-[400] text-[#64748B] leading-relaxed">
+              AI-powered scenario modeling for macro events and micro supplier failures.
+            </p>
+          </motion.div>
+
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.3 }}
+            viewport={{ once: true }}
+            className={cardBaseClasses}
+          >
+            <div className={iconBaseClasses}>
+              <BarChart2 className="w-6 h-6 text-[#2563EB]" />
+            </div>
+            <h3 className="text-[16px] font-[600] text-[#0F172A] mb-3">Impact Assessment</h3>
+            <p className="text-[14px] font-[400] text-[#64748B] leading-relaxed">
+              Real-time analytics and insights tracking cascading financial and operational impacts.
+            </p>
+          </motion.div>
         </div>
-      </div>
-      
-      {/* Call to action */}
-      <motion.div 
-        initial={{ opacity: 0, y: 30 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6, delay: 0.8 }}
-        viewport={{ once: true }}
-        className="text-center mt-16"
-      >
-        <a 
-          href="/digital-twin"
-          className="btn-donate inline-flex items-center gap-2"
-          style={{
-            '--clr-font-main': 'hsla(0 0% 20% / 100)',
-            '--btn-bg-1': 'hsla(194 100% 69% / 1)',
-            '--btn-bg-2': 'hsla(217 100% 56% / 1)',
-            '--btn-bg-color': 'hsla(360 100% 100% / 1)',
-            '--radii': '0.5em',
-            cursor: 'pointer',
-            padding: '0.9em 1.4em',
-            minWidth: '120px',
-            minHeight: '44px',
-            fontSize: 'var(--size, 1rem)',
-            fontWeight: '500',
-            transition: '0.8s',
-            backgroundSize: '280% auto',
-            backgroundImage: 'linear-gradient(325deg, var(--btn-bg-2) 0%, var(--btn-bg-1) 55%, var(--btn-bg-2) 90%)',
-            border: 'none',
-            borderRadius: 'var(--radii)',
-            color: 'var(--btn-bg-color)',
-            boxShadow: '0px 0px 20px rgba(71, 184, 255, 0.5), 0px 5px 5px -1px rgba(58, 125, 233, 0.25), inset 4px 4px 8px rgba(175, 230, 255, 0.5), inset -4px -4px 8px rgba(19, 95, 216, 0.35)',
-            textDecoration: 'none'
-          } as React.CSSProperties}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundPosition = 'right top';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundPosition = 'left top';
-          }}
-          onFocus={(e) => {
-            e.currentTarget.style.outline = 'none';
-            e.currentTarget.style.boxShadow = '0 0 0 3px var(--btn-bg-color), 0 0 0 6px var(--btn-bg-2)';
-          }}
-          onBlur={(e) => {
-            e.currentTarget.style.boxShadow = '0px 0px 20px rgba(71, 184, 255, 0.5), 0px 5px 5px -1px rgba(58, 125, 233, 0.25), inset 4px 4px 8px rgba(175, 230, 255, 0.5), inset -4px -4px 8px rgba(19, 95, 216, 0.35)';
-          }}
+
+        {/* Right Featured Card */}
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.4 }}
+          viewport={{ once: true }}
+          className={`${cardBaseClasses} lg:col-span-1 h-full relative overflow-hidden bg-gradient-to-br from-[rgba(255,255,255,0.7)] to-[rgba(255,255,255,0.4)]`}
         >
-          <span className="font-medium">See It In Action</span>
-          <IconArrowRight className="h-4 w-4" />
-        </a>
+          <div className="absolute top-0 right-0 p-8 opacity-[0.03] pointer-events-none">
+            <Zap className="w-48 h-48" />
+          </div>
+          
+          <h3 className="text-[20px] font-[600] text-[#0F172A] mb-4 relative z-10">Smart Strategies</h3>
+          <p className="text-[14px] font-[400] text-[#64748B] mb-8 leading-relaxed relative z-10">
+            When disruptions occur, our AI autonomous agents instantly generate tactical recovery plans to minimize financial damage and protect service levels.
+          </p>
+
+          <ul className="space-y-4 mb-auto relative z-10">
+            {['AI Recommendations', 'ROI Optimization', 'Alternative Routes', 'Risk Mitigation'].map((item, i) => (
+              <li key={i} className="flex items-center gap-3">
+                <div className="flex-shrink-0 w-5 h-5 rounded-full bg-gradient-to-r from-[#2563EB] to-[#7C3AED] flex items-center justify-center p-[4px]">
+                  <ArrowRight className="w-full h-full text-white" />
+                </div>
+                <span className="text-[15px] font-[500] text-[#0F172A]">{item}</span>
+              </li>
+            ))}
+          </ul>
+
+          <div className="mt-8 pt-6 border-t border-[rgba(0,0,0,0.06)] relative z-10">
+            <a 
+              href="#features" 
+              onClick={(e) => smoothScroll(e, 'features')}
+              className="inline-flex items-center text-[15px] font-[600] text-[#2563EB] hover:text-[#7C3AED] transition-colors group"
+            >
+              Learn more 
+              <span className="ml-1 inline-block transform group-hover:translate-x-1 transition-transform">&rarr;</span>
+            </a>
+          </div>
+        </motion.div>
+
+      </div>
+
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.8 }}
+        viewport={{ once: true }}
+        className="flex justify-center"
+      >
+        <GlowyButton href="/dashboard" className="px-10 py-4 text-base">
+          See It In Action &rarr;
+        </GlowyButton>
       </motion.div>
+
     </section>
   );
 }
+
+export default TimelineSteps;
