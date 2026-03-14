@@ -26,7 +26,6 @@ import {
 } from "lucide-react"
 import NodeImpactGridWithVisualize from "@/components/simulation/node-impact-grid-with-visualize"
 import { DEFAULT_SIMULATION_NODES } from "@/lib/data/simulation-nodes"
-import { GlassmorphicCard } from "@/components/ui/glassmorphic-card"
 import { getSimulationById, getImpactResults, getEnhancedSimulationResults, triggerImpactAssessment } from "@/lib/api/simulation"
 import type { Simulation, ImpactResult } from "@/lib/types/database"
 
@@ -362,18 +361,17 @@ export default function SimulationResultPage() {
     color: string;
     iconColor: string;
   }) => (
-    <GlassmorphicCard className="p-5 hover:scale-105 transition-transform duration-300">
+    <Card className="p-5 border border-gray-200 dark:border-gray-800 shadow-sm transition-all duration-300">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-sm font-medium text-muted-foreground mb-2">{label}</p>
-          <p className={`text-2xl font-bold ${color}`}>{value}</p>
+          <p className="text-sm font-medium text-gray-500 mb-2">{label}</p>
+          <p className={`text-2xl font-bold text-black dark:text-white`}>{value}</p>
         </div>
         <div className="relative">
-          <div className="absolute inset-0 bg-current opacity-10 rounded-full blur-lg"></div>
-          <Icon className={`h-7 w-7 ${iconColor} relative z-10`} />
+          <Icon className={`h-7 w-7 text-gray-400 dark:text-gray-500 relative z-10`} />
         </div>
       </div>
-    </GlassmorphicCard>
+    </Card>
   )
 
   // Component for rendering analysis items
@@ -423,23 +421,17 @@ export default function SimulationResultPage() {
   // Show loading state
   if (isLoading) {
     return (
-      <div className="relative min-h-full flex-1 bg-gradient-to-br from-slate-50 via-blue-50/40 to-indigo-100/50 dark:from-gray-900 dark:via-slate-900 dark:to-indigo-950">
-        {/* Elegant Background Elements */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute top-1/4 left-1/4 w-96 h-96 rounded-full bg-gradient-to-br from-emerald-400/15 to-blue-400/10 dark:from-emerald-900/25 dark:to-blue-900/20 blur-3xl animate-pulse will-change-transform"></div>
-          <div className="absolute bottom-1/3 right-1/3 w-80 h-80 rounded-full bg-gradient-to-br from-blue-400/10 to-indigo-400/8 dark:from-blue-900/20 dark:to-indigo-900/15 blur-3xl animate-pulse [animation-delay:2s] will-change-transform"></div>
-        </div>
+      <div className="relative min-h-full flex-1 bg-white dark:bg-black text-black dark:text-white">
         <div className="relative z-10 p-6 px-10">
           <div className="max-w-7xl mx-auto">
             <div className="flex items-center justify-center min-h-[50vh]">
               <div className="text-center space-y-6">
                 <div className="relative">
-                  <Activity className="h-16 w-16 animate-spin mx-auto text-blue-500" />
-                  <div className="absolute inset-0 bg-blue-500/20 rounded-full blur-lg animate-pulse"></div>
+                  <Activity className="h-16 w-16 animate-spin mx-auto text-black dark:text-white" />
                 </div>
                 <div className="space-y-2">
-                  <p className="text-xl font-semibold text-slate-700 dark:text-slate-200">Loading simulation results...</p>
-                  <p className="text-sm text-slate-500 dark:text-slate-400">Please wait while we prepare your analysis</p>
+                  <p className="text-xl font-semibold">Loading simulation results...</p>
+                  <p className="text-sm text-gray-500">Please wait while we prepare your analysis</p>
                 </div>
               </div>
             </div>
@@ -450,37 +442,31 @@ export default function SimulationResultPage() {
   }
 
   return (
-    <div className="relative min-h-full flex-1 bg-gradient-to-br from-slate-50 via-blue-50/40 to-indigo-100/50 dark:from-gray-900 dark:via-slate-900 dark:to-indigo-950">
-      {/* Elegant Background Elements */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 rounded-full bg-gradient-to-br from-emerald-400/15 to-blue-400/10 dark:from-emerald-900/25 dark:to-blue-900/20 blur-3xl animate-pulse will-change-transform"></div>
-        <div className="absolute bottom-1/3 right-1/3 w-80 h-80 rounded-full bg-gradient-to-br from-blue-400/10 to-indigo-400/8 dark:from-blue-900/20 dark:to-indigo-900/15 blur-3xl animate-pulse [animation-delay:2s] will-change-transform"></div>
-        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-72 h-72 rounded-full bg-gradient-to-br from-purple-400/8 to-pink-400/6 dark:from-purple-900/15 dark:to-pink-900/12 blur-3xl animate-pulse [animation-delay:4s] will-change-transform"></div>
-      </div>
+    <div className="relative min-h-full flex-1 bg-white dark:bg-black text-black dark:text-white">
 
       <div className="relative z-10 p-6 px-10">
         <div className="max-w-7xl mx-auto">
           {/* Elegant Header */}
-          <GlassmorphicCard variant="accent" className="p-8 mb-10">
+          <Card className="p-8 mb-10 border border-gray-200 dark:border-gray-800 bg-white dark:bg-black shadow-sm">
             <div className="flex items-start justify-between">
               <div className="space-y-6">
                 <div className="flex items-center gap-3">
                   <Button 
                     variant="ghost" 
                     onClick={handleBackToSimulation}
-                    className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors rounded-lg px-3 py-2"
+                    className="flex items-center gap-2 text-gray-500 hover:text-black dark:text-gray-400 dark:hover:text-white border border-gray-200 dark:border-gray-800 rounded-lg px-3 py-2"
                     aria-label="Navigate back to simulation page"
                   >
                     <ArrowLeft className="h-4 w-4" />
                     Back to Simulation
                   </Button>
                   <div className="flex items-center gap-2">
-                    <Badge className="bg-green-500/15 text-green-700 dark:text-green-300 border-green-500/25 flex items-center gap-2 px-3 py-1">
-                      <CheckCircle className="h-3 w-3" />
+                    <Badge className="bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200 border border-gray-200 dark:border-gray-800 flex items-center gap-2 px-3 py-1">
+                      <CheckCircle className="h-3 w-3 border-gray-800 dark:border-gray-200" />
                       {simulationResults.status.toUpperCase()}
                     </Badge>
                     {isEnhancedAnalysis && (
-                      <Badge className="bg-purple-500/15 text-purple-700 dark:text-purple-300 border-purple-500/25 flex items-center gap-2 px-3 py-1">
+                      <Badge className="bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200 border border-gray-200 dark:border-gray-800 flex items-center gap-2 px-3 py-1">
                         <Sparkles className="h-3 w-3" />
                         AI Enhanced
                       </Badge>
@@ -489,18 +475,18 @@ export default function SimulationResultPage() {
                 </div>
                 
                 <div className="space-y-3">
-                  <h1 className="text-3xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-emerald-600 via-blue-600 to-indigo-600 dark:from-emerald-400 dark:via-blue-400 dark:to-indigo-400">
+                  <h1 className="text-3xl font-bold tracking-tight text-black dark:text-white">
                     Simulation Results
                   </h1>
-                  <p className="text-slate-700 dark:text-slate-200 text-base font-semibold">
+                  <p className="text-gray-600 dark:text-gray-300 text-base font-semibold">
                     {simulationResults.scenarioName}
                   </p>
                   <div className="flex items-center gap-4 text-sm">
-                    <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-medium">
-                      <div className="w-2 h-2 bg-emerald-500 rounded-full"></div>
+                    <div className="flex items-center gap-2 text-gray-500 font-medium">
+                      <div className="w-2 h-2 bg-gray-400 dark:bg-gray-600 rounded-full"></div>
                       Completed {formattedDate}
                     </div>
-                    <div className="text-slate-600 dark:text-slate-300 font-medium">
+                    <div className="text-gray-500 font-medium">
                       {simulationResults.scenarioType}
                     </div>
                   </div>
@@ -519,12 +505,12 @@ export default function SimulationResultPage() {
                   <Button 
                     onClick={handleGenerateImpactAssessment}
                     disabled={isGeneratingImpact}
-                    className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 shadow-lg hover:shadow-xl transition-all duration-300 rounded-xl"
+                    className="bg-white text-black border border-gray-200 hover:bg-gray-50 dark:bg-black dark:text-white dark:border-gray-800 dark:hover:bg-gray-900 shadow-sm transition-all duration-300 rounded-xl"
                     aria-label="Generate comprehensive AI impact assessment"
                   >
                     {isGeneratingImpact ? (
                       <>
-                        <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-r-transparent" />
+                        <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-black border-r-transparent dark:border-white" />
                         Analyzing...
                       </>
                     ) : (
@@ -537,7 +523,7 @@ export default function SimulationResultPage() {
                 )}
                 <Button 
                   onClick={handleViewMitigationStrategy}
-                  className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-lg hover:shadow-xl transition-all duration-300 rounded-xl"
+                  className="bg-black text-white hover:bg-gray-800 dark:bg-white dark:text-black dark:hover:bg-gray-200 shadow-sm transition-all duration-300 rounded-xl"
                   aria-label="View detailed mitigation strategy"
                 >
                   <Eye className="mr-2 h-4 w-4" />
@@ -545,7 +531,7 @@ export default function SimulationResultPage() {
                 </Button>
               </div>
             </div>
-          </GlassmorphicCard>
+          </Card>
 
 
 
@@ -563,35 +549,35 @@ export default function SimulationResultPage() {
           <section aria-labelledby="overview-title" className="mb-8">
             <h2 id="overview-title" className="sr-only">Scenario Overview and Risk Assessment</h2>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <GlassmorphicCard variant="accent" className="p-6">
+              <Card className="p-6 border border-gray-200 dark:border-gray-800 bg-white dark:bg-black shadow-sm">
                 <CardHeader className="p-0 pb-4">
-                  <CardTitle className="flex items-center gap-3 text-xl">
-                    <TrendingDown className="h-5 w-5 text-blue-500" />
+                  <CardTitle className="flex items-center gap-3 text-xl text-black dark:text-white">
+                    <TrendingDown className="h-5 w-5 text-gray-400" />
                     Scenario Overview
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="p-0 space-y-4">
                   <div className="space-y-3">
-                    <div className="flex justify-between items-center p-3 bg-blue-50/50 dark:bg-blue-950/20 rounded-lg border border-blue-200/30 dark:border-blue-800/30">
-                      <span className="font-medium text-slate-700 dark:text-slate-300 text-sm">Affected Nodes</span>
-                      <span className="font-bold text-blue-600 dark:text-blue-400 text-sm">{simulationResults.metrics.affectedNodes}</span>
+                    <div className="flex justify-between items-center p-3 rounded-lg border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900">
+                      <span className="font-medium text-gray-500 dark:text-gray-400 text-sm">Affected Nodes</span>
+                      <span className="font-bold text-black dark:text-white text-sm">{simulationResults.metrics.affectedNodes}</span>
                     </div>
-                    <div className="p-3 bg-slate-50/50 dark:bg-slate-800/30 rounded-lg border border-slate-200/30 dark:border-slate-700/30">
-                      <span className="font-medium text-slate-700 dark:text-slate-300 block mb-1 text-sm">Critical Path</span>
-                      <span className="text-slate-600 dark:text-slate-400 text-sm">{simulationResults.metrics.criticalPath}</span>
+                    <div className="p-3 rounded-lg border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900">
+                      <span className="font-medium text-gray-500 dark:text-gray-400 block mb-1 text-sm">Critical Path</span>
+                      <span className="text-black dark:text-white text-sm">{simulationResults.metrics.criticalPath}</span>
                     </div>
-                    <div className="flex justify-between items-center p-3 bg-emerald-50/50 dark:bg-emerald-950/20 rounded-lg border border-emerald-200/30 dark:border-emerald-800/30">
-                      <span className="font-medium text-slate-700 dark:text-slate-300 text-sm">Disruption Type</span>
-                      <span className="font-bold text-emerald-600 dark:text-emerald-400 text-sm">{simulationResults.scenarioType}</span>
+                    <div className="flex justify-between items-center p-3 rounded-lg border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900">
+                      <span className="font-medium text-gray-500 dark:text-gray-400 text-sm">Disruption Type</span>
+                      <span className="font-bold text-black dark:text-white text-sm">{simulationResults.scenarioType}</span>
                     </div>
                   </div>
                 </CardContent>
-              </GlassmorphicCard>
+              </Card>
 
-              <GlassmorphicCard variant="subtle" className="p-6">
+              <Card className="p-6 border border-gray-200 dark:border-gray-800 bg-white dark:bg-black shadow-sm">
                 <CardHeader className="p-0 pb-4">
-                  <CardTitle className="flex items-center gap-3 text-xl">
-                    <AlertTriangle className="h-5 w-5 text-amber-500" />
+                  <CardTitle className="flex items-center gap-3 text-xl text-black dark:text-white">
+                    <AlertTriangle className="h-5 w-5 text-gray-400" />
                     Risk Factors
                   </CardTitle>
                 </CardHeader>
@@ -599,11 +585,11 @@ export default function SimulationResultPage() {
                   <div className="space-y-3">
                     {simulationResults.riskFactors.length > 0 ? (
                       simulationResults.riskFactors.slice(0, 3).map((factor, index) => (
-                        <div key={index} className="flex items-start gap-3 p-3 bg-amber-50/30 dark:bg-amber-950/10 rounded-lg border border-amber-200/20 dark:border-amber-800/20">
-                          <div className="w-6 h-6 bg-gradient-to-br from-amber-400 to-orange-500 text-white rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">
+                        <div key={index} className="flex items-start gap-3 p-3 rounded-lg border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900">
+                          <div className="w-6 h-6 bg-gray-200 dark:bg-gray-800 text-gray-800 dark:text-gray-200 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">
                             {index + 1}
                           </div>
-                          <p className="text-sm leading-relaxed text-slate-700 dark:text-slate-300">{factor}</p>
+                          <p className="text-sm leading-relaxed text-gray-600 dark:text-gray-300">{factor}</p>
                         </div>
                       ))
                     ) : (
@@ -616,18 +602,18 @@ export default function SimulationResultPage() {
                     )}
                   </div>
                 </CardContent>
-              </GlassmorphicCard>
+              </Card>
             </div>
           </section>
 
           {/* Tabbed Analysis - Key Findings, Financial Impact, and Total Cost Impact */}
           <section aria-labelledby="analysis-title">
-            <GlassmorphicCard className="p-6 mb-8">
+            <Card className="p-6 mb-8 border border-gray-200 dark:border-gray-800 bg-white dark:bg-black shadow-sm">
               <CardHeader className="p-0 pb-6">
-                <CardTitle className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-emerald-600 via-blue-600 to-indigo-600 dark:from-emerald-400 dark:via-blue-400 dark:to-indigo-400" id="analysis-title">
+                <CardTitle className="text-2xl font-bold text-black dark:text-white" id="analysis-title">
                   Analysis & Impact Assessment
                 </CardTitle>
-                <CardDescription className="text-base text-slate-600 dark:text-slate-300">
+                <CardDescription className="text-base text-gray-500 dark:text-gray-400">
                   {isEnhancedAnalysis ? (
                     <>
                       AI-powered critical insights and financial implications with 
@@ -645,24 +631,24 @@ export default function SimulationResultPage() {
               </CardHeader>
               <CardContent className="p-0">
                 <Tabs defaultValue="key-findings" className="w-full">
-                  <TabsList className="grid w-full grid-cols-3 mb-6 bg-slate-100/50 dark:bg-slate-800/50 rounded-lg p-1">
+                  <TabsList className="grid w-full grid-cols-3 mb-6 bg-gray-100 dark:bg-gray-900 rounded-lg p-1">
                     <TabsTrigger 
                       value="key-findings" 
-                      className="flex items-center gap-2 rounded-md data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-indigo-600 data-[state=active]:text-white text-sm"
+                      className="flex items-center gap-2 rounded-md data-[state=active]:bg-white data-[state=active]:text-black dark:data-[state=active]:bg-black dark:data-[state=active]:text-white data-[state=active]:shadow-sm text-sm"
                     >
                       <FileText className="h-4 w-4" />
                       Key Findings
                     </TabsTrigger>
                     <TabsTrigger 
                       value="financial-impact" 
-                      className="flex items-center gap-2 rounded-md data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-500 data-[state=active]:to-green-600 data-[state=active]:text-white text-sm"
+                      className="flex items-center gap-2 rounded-md data-[state=active]:bg-white data-[state=active]:text-black dark:data-[state=active]:bg-black dark:data-[state=active]:text-white data-[state=active]:shadow-sm text-sm"
                     >
                       <BarChart3 className="h-4 w-4" />
                       Financial Impact
                     </TabsTrigger>
                     <TabsTrigger 
                       value="total-cost" 
-                      className="flex items-center gap-2 rounded-md data-[state=active]:bg-gradient-to-r data-[state=active]:from-red-500 data-[state=active]:to-pink-600 data-[state=active]:text-white text-sm"
+                      className="flex items-center gap-2 rounded-md data-[state=active]:bg-white data-[state=active]:text-black dark:data-[state=active]:bg-black dark:data-[state=active]:text-white data-[state=active]:shadow-sm text-sm"
                     >
                       <Target className="h-4 w-4" />
                       Total Cost Impact
@@ -1082,11 +1068,11 @@ export default function SimulationResultPage() {
                             <Button 
                               onClick={handleGenerateImpactAssessment}
                               disabled={isGeneratingImpact}
-                              className="bg-gradient-to-r from-red-600 to-pink-600 hover:from-red-700 hover:to-pink-700"
+                              className="bg-white text-black border border-gray-200 hover:bg-gray-50 dark:bg-black dark:text-white dark:border-gray-800 dark:hover:bg-gray-900 shadow-sm transition-all duration-300"
                             >
                               {isGeneratingImpact ? (
                                 <>
-                                  <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-r-transparent" />
+                                  <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-black border-r-transparent dark:border-white" />
                                   Generating Analysis...
                                 </>
                               ) : (
@@ -1103,52 +1089,52 @@ export default function SimulationResultPage() {
                   </TabsContent>
                 </Tabs>
               </CardContent>
-            </GlassmorphicCard>
+            </Card>
           </section>
 
           {/* Cascading Effects Analysis - Show whenever cascading effects exist */}
           {simulationResults.cascadingEffects && simulationResults.cascadingEffects.length > 0 && (
             <section aria-labelledby="cascading-title">
-              <GlassmorphicCard className="p-6 mb-8">
+              <Card className="p-6 mb-8 border border-gray-200 dark:border-gray-800 bg-white dark:bg-black shadow-sm">
                 <CardHeader className="p-0 pb-6">
-                  <CardTitle className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-red-600 via-orange-600 to-yellow-600 dark:from-red-400 dark:via-orange-400 dark:to-yellow-400" id="cascading-title">
+                  <CardTitle className="text-2xl font-bold text-black dark:text-white" id="cascading-title">
                     Cascading Effects Analysis
                   </CardTitle>
-                  <CardDescription className="text-base text-slate-600 dark:text-slate-300">
+                  <CardDescription className="text-base text-gray-500 dark:text-gray-400">
                     AI-identified potential cascading impacts across the supply chain network
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="p-0">
                   <div className="grid gap-3">
                     {simulationResults.cascadingEffects.map((effect, index) => (
-                      <div key={index} className="p-4 rounded-lg border shadow-sm hover:shadow-md transition-shadow bg-gradient-to-r from-red-50/50 to-orange-50/30 dark:from-red-950/20 dark:to-orange-950/10 border-red-200/30 dark:border-red-800/20">
+                      <div key={index} className="p-4 rounded-lg border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 shadow-sm hover:shadow-md transition-shadow">
                         <div className="flex items-start gap-3">
                           <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-white text-sm font-bold ${
-                            effect.severity === 'CRITICAL' ? 'bg-gradient-to-br from-red-600 to-red-700' :
-                            effect.severity === 'HIGH' ? 'bg-gradient-to-br from-orange-500 to-orange-600' :
-                            effect.severity === 'MEDIUM' ? 'bg-gradient-to-br from-yellow-500 to-yellow-600' :
-                            'bg-gradient-to-br from-blue-500 to-blue-600'
+                            effect.severity === 'CRITICAL' ? 'bg-black dark:bg-white dark:text-black font-bold' :
+                            effect.severity === 'HIGH' ? 'bg-gray-800 dark:bg-gray-200 dark:text-black font-bold' :
+                            effect.severity === 'MEDIUM' ? 'bg-gray-600 dark:bg-gray-400 dark:text-black font-bold' :
+                            'bg-gray-400 dark:bg-gray-600 dark:text-black font-bold'
                           }`}>
                             {index + 1}
                           </div>
                           <div className="flex-1">
                             <div className="flex items-center gap-2 mb-2">
                               <Badge className={`text-xs ${
-                                effect.severity === 'CRITICAL' ? 'bg-red-500/20 text-red-700 dark:text-red-300 border-red-500/30' :
-                                effect.severity === 'HIGH' ? 'bg-orange-500/20 text-orange-700 dark:text-orange-300 border-orange-500/30' :
-                                effect.severity === 'MEDIUM' ? 'bg-yellow-500/20 text-yellow-700 dark:text-yellow-300 border-yellow-500/30' :
-                                'bg-blue-500/20 text-blue-700 dark:text-blue-300 border-blue-500/30'
+                                effect.severity === 'CRITICAL' ? 'bg-black text-white dark:bg-white dark:text-black border-transparent' :
+                                effect.severity === 'HIGH' ? 'bg-gray-800 text-white dark:bg-gray-200 dark:text-black border-transparent' :
+                                effect.severity === 'MEDIUM' ? 'bg-gray-600 text-white dark:bg-gray-400 dark:text-black border-transparent' :
+                                'bg-gray-400 text-white dark:bg-gray-600 dark:text-black border-transparent'
                               }`}>
                                 {effect.severity} Impact
                               </Badge>
-                              <Badge variant="outline" className="text-xs">
+                              <Badge variant="outline" className="text-xs border-gray-200 dark:border-gray-800 text-gray-600 dark:text-gray-300">
                                 {effect.timeline}
                               </Badge>
                             </div>
-                            <h4 className="font-semibold text-slate-800 dark:text-slate-200 mb-1 text-sm">
+                            <h4 className="font-semibold text-black dark:text-white mb-1 text-sm">
                               {effect.affectedNode}
                             </h4>
-                            <p className="text-sm text-slate-600 dark:text-slate-300">
+                            <p className="text-sm text-gray-600 dark:text-gray-400">
                               {effect.impactType}
                             </p>
                           </div>
@@ -1157,59 +1143,59 @@ export default function SimulationResultPage() {
                     ))}
                   </div>
                 </CardContent>
-              </GlassmorphicCard>
+              </Card>
             </section>
           )}
 
           {/* Mitigation Strategies - Show whenever strategies exist */}
           {simulationResults.mitigationStrategies && simulationResults.mitigationStrategies.length > 0 && (
             <section aria-labelledby="mitigation-title">
-              <GlassmorphicCard className="p-6 mb-8">
+              <Card className="p-6 mb-8 border border-gray-200 dark:border-gray-800 bg-white dark:bg-black shadow-sm">
                 <CardHeader className="p-0 pb-6">
-                  <CardTitle className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-green-600 via-emerald-600 to-teal-600 dark:from-green-400 dark:via-emerald-400 dark:to-teal-400" id="mitigation-title">
+                  <CardTitle className="text-2xl font-bold text-black dark:text-white" id="mitigation-title">
                     AI-Recommended Mitigation Strategies
                   </CardTitle>
-                  <CardDescription className="text-base text-slate-600 dark:text-slate-300">
+                  <CardDescription className="text-base text-gray-500 dark:text-gray-400">
                     Strategic recommendations with ROI analysis and implementation roadmap
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="p-0">
                   <div className="space-y-4">
                     {simulationResults.mitigationStrategies.slice(0, 3).map((strategy, index) => (
-                      <div key={index} className="p-4 rounded-lg border shadow-sm hover:shadow-md transition-shadow bg-gradient-to-r from-green-50/50 to-emerald-50/30 dark:from-green-950/20 dark:to-emerald-950/10 border-green-200/30 dark:border-green-800/20">
+                      <div key={index} className="p-4 rounded-lg border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 shadow-sm hover:shadow-md transition-shadow">
                         <div className="flex items-start gap-3">
                           <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-white text-sm font-bold ${
-                            strategy.feasibility === 'HIGH' ? 'bg-gradient-to-br from-green-600 to-green-700' :
-                            strategy.feasibility === 'MEDIUM' ? 'bg-gradient-to-br from-yellow-500 to-yellow-600' :
-                            'bg-gradient-to-br from-red-500 to-red-600'
+                            strategy.feasibility === 'HIGH' ? 'bg-black dark:bg-white dark:text-black' :
+                            strategy.feasibility === 'MEDIUM' ? 'bg-gray-600 dark:bg-gray-400 dark:text-black' :
+                            'bg-gray-400 dark:bg-gray-600 dark:text-black'
                           }`}>
                             {index + 1}
                           </div>
                           <div className="flex-1">
                             <div className="flex items-center gap-2 mb-3">
                               <Badge className={`text-xs ${
-                                strategy.feasibility === 'HIGH' ? 'bg-green-500/20 text-green-700 dark:text-green-300 border-green-500/30' :
-                                strategy.feasibility === 'MEDIUM' ? 'bg-yellow-500/20 text-yellow-700 dark:text-yellow-300 border-yellow-500/30' :
-                                'bg-red-500/20 text-red-700 dark:text-red-300 border-red-500/30'
+                                strategy.feasibility === 'HIGH' ? 'bg-black text-white dark:bg-white dark:text-black border-transparent' :
+                                strategy.feasibility === 'MEDIUM' ? 'bg-gray-600 text-white dark:bg-gray-400 dark:text-black border-transparent' :
+                                'bg-gray-400 text-white dark:bg-gray-600 dark:text-black border-transparent'
                               }`}>
                                 {strategy.feasibility} Feasibility
                               </Badge>
                             </div>
-                            <p className="text-sm text-slate-700 dark:text-slate-300 mb-3 leading-relaxed">
+                            <p className="text-sm text-black dark:text-white mb-3 leading-relaxed">
                               {strategy.strategy}
                             </p>
                             <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
-                              <div className="bg-white/60 dark:bg-gray-800/60 rounded-md p-2">
-                                <div className="font-semibold text-slate-800 dark:text-slate-200 text-xs">Cost</div>
-                                <div className="text-slate-600 dark:text-slate-300 text-xs">{strategy.estimatedCost}</div>
+                              <div className="bg-white dark:bg-black border border-gray-200 dark:border-gray-800 rounded-md p-2">
+                                <div className="font-semibold text-gray-500 dark:text-gray-400 text-xs">Cost</div>
+                                <div className="text-black dark:text-white text-xs">{strategy.estimatedCost}</div>
                               </div>
-                              <div className="bg-white/60 dark:bg-gray-800/60 rounded-md p-2">
-                                <div className="font-semibold text-slate-800 dark:text-slate-200 text-xs">Timeline</div>
-                                <div className="text-slate-600 dark:text-slate-300 text-xs">{strategy.timeToImplement}</div>
+                              <div className="bg-white dark:bg-black border border-gray-200 dark:border-gray-800 rounded-md p-2">
+                                <div className="font-semibold text-gray-500 dark:text-gray-400 text-xs">Timeline</div>
+                                <div className="text-black dark:text-white text-xs">{strategy.timeToImplement}</div>
                               </div>
-                              <div className="bg-white/60 dark:bg-gray-800/60 rounded-md p-2">
-                                <div className="font-semibold text-slate-800 dark:text-slate-200 text-xs">Risk Reduction</div>
-                                <div className="text-slate-600 dark:text-slate-300 text-xs">{strategy.riskReduction}</div>
+                              <div className="bg-white dark:bg-black border border-gray-200 dark:border-gray-800 rounded-md p-2">
+                                <div className="font-semibold text-gray-500 dark:text-gray-400 text-xs">Risk Reduction</div>
+                                <div className="text-black dark:text-white text-xs">{strategy.riskReduction}</div>
                               </div>
                             </div>
                           </div>
@@ -1218,18 +1204,18 @@ export default function SimulationResultPage() {
                     ))}
                   </div>
                 </CardContent>
-              </GlassmorphicCard>
+              </Card>
             </section>
           )}
 
           {/* Node Analysis Section */}
           {/* <section aria-labelledby="node-analysis-title">
-            <GlassmorphicCard className="p-6">
+            <Card className="p-6 border border-gray-200 dark:border-gray-800 bg-white dark:bg-black shadow-sm">
               <CardHeader className="p-0 pb-6">
-                <CardTitle className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-purple-600 via-pink-600 to-red-600 dark:from-purple-400 dark:via-pink-400 dark:to-red-400" id="node-analysis-title">
+                <CardTitle className="text-2xl font-bold text-black dark:text-white" id="node-analysis-title">
                   Supply Chain Node Analysis
                 </CardTitle>
-                <CardDescription className="text-base text-slate-600 dark:text-slate-300">
+                <CardDescription className="text-base text-gray-500 dark:text-gray-400">
                   Detailed impact assessment across all network nodes
                 </CardDescription>
               </CardHeader>
@@ -1240,7 +1226,7 @@ export default function SimulationResultPage() {
                   description="Detailed impact assessment across all network nodes"
                 />
               </CardContent>
-            </GlassmorphicCard>
+            </Card>
           </section> */}
         </div>
       </div>

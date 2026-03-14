@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import { useQueryState, parseAsString, parseAsInteger, parseAsArrayOf } from 'nuqs';
 import { decompressArchData } from '@/lib/utils/url-compression';
-import { Header } from '@/components/header';
 import DigitalTwinDashboard from '@/components/digital-twin/display/dashboard';
 import CreationForm from '@/components/digital-twin/forms/creation-form';
 import DigitalTwinCanvas from '@/components/digital-twin/canvas/digital-twin-canvas';
@@ -38,8 +37,6 @@ export default function DigitalTwinClientPage() {
   const [annualVolumeValueParam] = useQueryState('annualVolumeValue', parseAsInteger);
   const [risksParam] = useQueryState('risks', parseAsArrayOf(parseAsString));
 
-  // Determine if header should be shown (only when neither twinId nor arch are present)
-  const shouldShowHeader = !twinId && !archParam;
 
   // Helper to check compressed form data or legacy individual params
   const hasFormDataInUrl = () => {
@@ -268,8 +265,7 @@ export default function DigitalTwinClientPage() {
   // The dashboard is always rendered, and the dialog is overlaid on top.
   return (
     <>
-      {shouldShowHeader && <Header title="Digital Twin" />}
-      <main className={shouldShowHeader ? "flex-1 overflow-auto" : ""}>
+      <main className="flex-1 overflow-auto">
         <DigitalTwinDashboard />
       </main>
       <Dialog

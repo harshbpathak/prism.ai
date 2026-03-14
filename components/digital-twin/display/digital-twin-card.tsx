@@ -25,10 +25,10 @@ interface DigitalTwinCardProps {
 
 export default function DigitalTwinCard({ twin }: DigitalTwinCardProps) {
   const getRiskColor = (tag: string) => {
-    if (tag.toLowerCase().includes('high risk')) return 'bg-gradient-to-r from-red-100 to-red-200 text-red-800 dark:from-red-900 dark:to-red-800 dark:text-red-200 shadow-sm';
-    if (tag.toLowerCase().includes('medium risk')) return 'bg-gradient-to-r from-yellow-100 to-orange-200 text-yellow-800 dark:from-yellow-900 dark:to-orange-800 dark:text-yellow-200 shadow-sm';
-    if (tag.toLowerCase().includes('low risk')) return 'bg-gradient-to-r from-green-100 to-emerald-200 text-green-800 dark:from-green-900 dark:to-emerald-800 dark:text-green-200 shadow-sm';
-    return 'bg-gradient-to-r from-gray-100 to-gray-200 text-gray-800 dark:from-gray-700 dark:to-gray-600 dark:text-gray-200 shadow-sm';
+    if (tag.toLowerCase().includes('high risk')) return 'bg-black text-white dark:bg-white dark:text-black shadow-sm';
+    if (tag.toLowerCase().includes('medium risk')) return 'bg-gray-200 text-black dark:bg-gray-800 dark:text-white shadow-sm';
+    if (tag.toLowerCase().includes('low risk')) return 'bg-white text-gray-600 border border-gray-200 dark:bg-black dark:text-gray-400 dark:border-gray-800 shadow-sm';
+    return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200 border border-gray-200 dark:border-gray-800 shadow-sm';
   };
 
   return (
@@ -45,7 +45,7 @@ export default function DigitalTwinCard({ twin }: DigitalTwinCardProps) {
         </div>
         
         <CardHeader className="relative z-10 pb-3">
-          <CardTitle className="text-gray-800 dark:text-gray-100 group-hover:text-gray-900 dark:group-hover:text-white transition-colors duration-200 flex items-start justify-between pr-12">
+          <CardTitle className="text-black dark:text-white group-hover:text-gray-600 dark:group-hover:text-gray-300 transition-colors duration-200 flex items-start justify-between pr-12">
             <span className="line-clamp-2">{twin.name}</span>
           </CardTitle>
           <CardDescription className="text-gray-600 dark:text-gray-300 group-hover:text-gray-700 dark:group-hover:text-gray-200 transition-colors duration-200 line-clamp-2">
@@ -57,7 +57,7 @@ export default function DigitalTwinCard({ twin }: DigitalTwinCardProps) {
           <div className="flex flex-wrap gap-2">
             {twin.tags.map((tag, index) => {
               const isRiskTag = tag.toLowerCase().includes('risk');
-              const tagClass = isRiskTag ? getRiskColor(tag) : 'bg-gradient-to-r from-blue-100 to-indigo-200 text-blue-800 dark:from-blue-900 dark:to-indigo-800 dark:text-blue-200 shadow-sm';
+              const tagClass = isRiskTag ? getRiskColor(tag) : 'bg-white text-black border border-gray-200 dark:bg-black dark:text-white dark:border-gray-800 shadow-sm';
               const isDateTag = /\w{3}-\d{4}/.test(tag); // Matches format like "Jun-2024"
               
               return (

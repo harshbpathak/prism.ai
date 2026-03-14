@@ -188,7 +188,7 @@ const IntelligenceAnalysisDialog: FC<IntelligenceAnalysisDialogProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-2xl w-full mx-4 p-8 rounded-xl shadow-2xl">
+      <DialogContent className="sm:max-w-2xl w-full mx-4 p-8 rounded-xl shadow-2xl bg-blue-50/80 dark:bg-slate-900/50 border-slate-200/80 dark:border-slate-700/60">
 
         {/* Main content area */}
         {status === "streaming" ? (

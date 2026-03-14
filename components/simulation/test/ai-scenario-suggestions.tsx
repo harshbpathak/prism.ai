@@ -339,7 +339,7 @@ export function AIScenarioSuggestions({ open, onOpenChange, onSelectScenario }: 
         <SheetHeader>
           <div className="flex justify-between items-center">
             <SheetTitle className="flex items-center">
-              <Sparkles className="h-5 w-5 mr-2 text-yellow-500" />
+              <Sparkles className="h-5 w-5 mr-2 text-black dark:text-white" />
               AI Scenario Suggestions
               {fromCache && (
                 <Badge variant="secondary" className="ml-2">
@@ -380,9 +380,9 @@ export function AIScenarioSuggestions({ open, onOpenChange, onSelectScenario }: 
         </SheetHeader>
 
         {/* Custom Scenario Generator Section */}
-        <div className="mt-8 p-6 border rounded-lg bg-slate-50 dark:bg-slate-900/50 space-y-4">
+        <div className="mt-8 p-6 border rounded-lg bg-white dark:bg-black border-slate-200 dark:border-slate-800 space-y-4">
           <div className="flex items-center gap-2">
-            <Wand2 className="h-5 w-5 text-purple-500" />
+            <Wand2 className="h-5 w-5 text-black dark:text-white" />
             <h3 className="font-semibold text-lg">Generate Custom Scenario</h3>
           </div>
           
@@ -485,7 +485,7 @@ export function AIScenarioSuggestions({ open, onOpenChange, onSelectScenario }: 
         {/* Recommended Scenarios Section */}
         <div>
           <h3 className="font-semibold mb-4 flex items-center">
-            <Sparkles className="h-4 w-4 mr-2 text-blue-500" />
+            <Sparkles className="h-4 w-4 mr-2" />
             Recommended Scenarios
             {scenarios.length > 0 && (
               <Badge variant="outline" className="ml-2 text-xs">
@@ -519,7 +519,7 @@ export function AIScenarioSuggestions({ open, onOpenChange, onSelectScenario }: 
           ) : (
             <div className="grid gap-4">
               {filteredScenarios.map((scenario, index) => (
-                <Card key={index} className="border hover:border-blue-400 transition-all">
+                <Card key={index} className="border border-slate-200 dark:border-slate-800 bg-white dark:bg-black transition-all hover:border-slate-400 dark:hover:border-slate-600 hover:shadow-sm">
                   <CardHeader className="pb-2">
                     <div className="flex justify-between items-center">
                       <div className="flex items-center">

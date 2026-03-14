@@ -29,7 +29,7 @@ export function FloatingRunButton({ isFormValid, onRunSimulation, scenarioData }
         onClick={onRunSimulation} 
         disabled={!isFormValid}
         size="lg"
-        className="shadow-xl h-12 px-6 text-base rounded-lg bg-primary hover:bg-primary/90 transition-all duration-200 hover:scale-105"
+        className="shadow-xl h-12 px-6 text-base rounded-lg bg-black text-white dark:bg-white dark:text-black hover:bg-black/90 dark:hover:bg-white/90 transition-all duration-200 hover:scale-105"
       >
         <PlayIcon className="mr-2" size={20} />
         {getButtonText()}

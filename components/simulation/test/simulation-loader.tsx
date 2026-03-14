@@ -158,7 +158,7 @@ export function SimulationLoader({ progress }: Props) {
               variants={progressVariants}
               initial="hidden"
               animate="visible"
-              className="h-full bg-primary origin-left"
+              className="h-full bg-black dark:bg-white origin-left"
               style={{ transformOrigin: "left" }}
             />
           </div>
@@ -174,7 +174,7 @@ export function SimulationLoader({ progress }: Props) {
           <motion.div
             animate={{ rotate: 360 }}
             transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-            className="w-3 h-3 border-2 border-primary border-t-transparent rounded-full"
+            className="w-3 h-3 border-2 border-black dark:border-white border-t-transparent rounded-full"
           />
           <span>
             {progress < 50 ? "Analyzing data patterns..." : "Generating insights..."}

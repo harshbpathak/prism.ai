@@ -241,7 +241,7 @@ const ValidationDialog: FC<ValidationDialogProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl h-[80vh] p-0 flex flex-col">
+      <DialogContent className="max-w-2xl h-[80vh] p-0 flex flex-col bg-blue-50/80 dark:bg-slate-900/50 border-slate-200/80 dark:border-slate-700/60">
         <DialogHeader className="p-4 pb-2">
           <DialogTitle className="flex items-center gap-2 text-lg">
             <AlertTriangle className="h-4 w-4 text-amber-500" />

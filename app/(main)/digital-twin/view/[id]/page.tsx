@@ -63,8 +63,9 @@ export default function DigitalTwinViewPage() {
 
   if (error) {
     return (
-      <div className="flex h-screen items-center justify-center bg-gradient-to-br from-background to-muted/20 p-4">
+      <div className="flex h-screen items-center justify-center bg-white dark:bg-black p-4">
         <motion.div
+
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
@@ -155,7 +156,6 @@ export default function DigitalTwinViewPage() {
         }
       >
         <div className="flex flex-col h-full flex-1">
-          <ViewModeHeader title={`Supply Chain View`} />
           
           <div className="flex flex-1 overflow-hidden">
             {/* Left Panel - AI Chat (collapsible) */}

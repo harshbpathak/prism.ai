@@ -8,11 +8,11 @@ import { SettingsIcon } from "@/components/icons/settings-icon"
 import { FileTextIcon } from "@/components/icons/file-text-icon"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 
-// Glassmorphic Card Component
-function GlassmorphicCard({ children, className = "", ...props }: { children: React.ReactNode; className?: string; [key: string]: any }) {
+// Minimalist Card Component
+function MinimalCard({ children, className = "", ...props }: { children: React.ReactNode; className?: string; [key: string]: any }) {
   return (
     <Card 
-      className={`border border-white/30 dark:border-slate-700/10 bg-white/70 dark:bg-slate-950 backdrop-blur-xl shadow-xl shadow-black/5 dark:shadow-black/20 rounded-xl ${className}`} 
+      className={`border border-slate-200 dark:border-slate-800 bg-white dark:bg-black shadow-sm rounded-xl transition-all duration-300 ${className}`} 
       {...props}
     >
       {children}
@@ -104,9 +104,9 @@ export function ScenarioConfigurationForm() {
         {/* Main Configuration Row */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Basic Configuration Card - Left Side */}
-          <GlassmorphicCard className="overflow-hidden">
+          <MinimalCard className="overflow-hidden">
             <CardHeader className="pb-4">
-              <CardTitle className="flex items-center gap-2 text-xl bg-gradient-to-r from-slate-800 to-slate-600 dark:from-white dark:to-slate-100 bg-clip-text text-transparent">
+              <CardTitle className="flex items-center gap-2 text-xl font-bold">
                 <CogIcon size={20} className="text-blue-500" />
                 Basic Configuration
               </CardTitle>
@@ -195,12 +195,12 @@ export function ScenarioConfigurationForm() {
                 </div>
               </div>
             </CardContent>
-          </GlassmorphicCard>
+          </MinimalCard>
 
           {/* Description and Impact Parameters Card - Right Side */}
-          <GlassmorphicCard className="overflow-hidden">
+          <MinimalCard className="overflow-hidden">
             <CardHeader className="pb-4">
-              <CardTitle className="flex items-center gap-2 text-xl bg-gradient-to-r from-slate-800 to-slate-600 dark:from-white dark:to-slate-100 bg-clip-text text-transparent">
+              <CardTitle className="flex items-center gap-2 text-xl font-bold">
                 <FileTextIcon size={20} className="text-green-500" />
                 Description & Impact Parameters
               </CardTitle>
@@ -267,13 +267,13 @@ export function ScenarioConfigurationForm() {
                 </div>
               </div>
             </CardContent>
-          </GlassmorphicCard>
+          </MinimalCard>
         </div>
 
         {/* Advanced Settings Card - Mandatory */}
-        <GlassmorphicCard className="overflow-hidden">
+        <MinimalCard className="overflow-hidden">
           <CardHeader className="pb-4">
-            <CardTitle className="flex items-center gap-2 text-xl bg-gradient-to-r from-slate-800 to-slate-600 dark:from-white dark:to-slate-100 bg-clip-text text-transparent">
+            <CardTitle className="flex items-center gap-2 text-xl font-bold">
               <SettingsIcon size={20} className="text-purple-500" />
               Advanced Settings
             </CardTitle>
@@ -472,7 +472,7 @@ export function ScenarioConfigurationForm() {
               </div>
             </div>
           </CardContent>
-        </GlassmorphicCard>
+        </MinimalCard>
       </div>
     </TooltipProvider>
   )

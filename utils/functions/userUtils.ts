@@ -2,29 +2,43 @@ import { supabaseClient } from "@/lib/supabase/client";
 
 const getUserData = async () => {
   try {
-    const { data } = await supabaseClient.auth.getSession();
+    const { data } = await supabaseClient.auth.getSession()
     
     if (!data?.session?.user?.id) {
-      // console.log("No active session found, skipping user data fetch.");
-      return null;
+      return null
     }
+
+    const authUser = data.session.user
 
     const userdetails = await supabaseClient
       .from('users')
       .select('*')
-      .eq('id', data.session.user.id);
+      .eq('id', authUser.id)
 
-    if (userdetails && userdetails.data && userdetails.data.length > 0) {
-      return userdetails.data[0];
-    } else {
-      console.log("No user data found in 'users' table.");
+    if (userdetails?.data && userdetails.data.length > 0) {
+      return userdetails.data[0]
+    }
+
+    // No row in users table yet — return a minimal object from auth so
+    // components that gate on userData?.id still function correctly.
+    console.log("No user data found in 'users' table, using auth session fallback.")
+    return {
+      id: authUser.id,
+      email: authUser.email ?? null,
+      organisation_name: null,
+      location: null,
+      employee_count: null,
+      industry: null,
+      sub_industry: null,
+      description: null,
     }
   } catch (err) {
-    console.log("Error occurred while fetching user data:", err);
+    console.log("Error occurred while fetching user data:", err)
+    return null
   }
-};
+}
 
-export { getUserData };
+export { getUserData }
 
 const updateUserData = async (data: any) => {
   try {

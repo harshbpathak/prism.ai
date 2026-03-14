@@ -124,13 +124,13 @@ export function NotificationFeed() {
   const getTypeIcon = (type: NotificationType) => {
     switch (type) {
       case "alert":
-        return <AlertTriangle className="h-4 w-4 text-red-500 dark:text-red-400" />
+        return <AlertTriangle className="h-4 w-4 text-black dark:text-white" />
       case "warning":
-        return <AlertTriangle className="h-4 w-4 text-amber-500 dark:text-amber-400" />
+        return <AlertTriangle className="h-4 w-4 text-gray-700 dark:text-gray-300" />
       case "info":
-        return <Info className="h-4 w-4 text-blue-500 dark:text-blue-400" />
+        return <Info className="h-4 w-4 text-gray-500 dark:text-gray-400" />
       case "success":
-        return <CheckCircle className="h-4 w-4 text-green-500 dark:text-green-400" />
+        return <CheckCircle className="h-4 w-4 text-black dark:text-white" />
     }
   }
 
@@ -179,7 +179,7 @@ export function NotificationFeed() {
           <div className="flex items-center gap-3">
             <h3 className="font-medium text-gray-900 dark:text-gray-100">Notifications</h3>
             {unreadCount > 0 && (
-              <Badge variant="secondary" className="bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 text-xs">
+              <Badge variant="secondary" className="bg-black text-white dark:bg-white dark:text-black border-none text-xs">
                 {unreadCount} new
               </Badge>
             )}
@@ -226,8 +226,8 @@ export function NotificationFeed() {
                     className={cn(
                       "rounded-lg border p-4 transition-all duration-200 hover:shadow-md cursor-pointer",
                       isRead 
-                        ? "bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800" 
-                        : "bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800"
+                        ? "bg-white dark:bg-black border-gray-200 dark:border-gray-800 opacity-80" 
+                        : "bg-gray-50 dark:bg-gray-900 border-black dark:border-white shadow-sm"
                     )}
                     onClick={() => handleViewDetails(notification)}
                   >
@@ -246,7 +246,7 @@ export function NotificationFeed() {
                           <div className="flex items-center gap-2">
                             <p className="font-medium text-gray-900 dark:text-gray-100 text-base leading-relaxed">{notification.title}</p>
                             {!isRead && (
-                              <span className="h-2 w-2 rounded-full bg-blue-500 flex-shrink-0 mt-1"></span>
+                              <span className="h-2 w-2 rounded-full bg-black dark:bg-white flex-shrink-0 mt-1"></span>
                             )}
                           </div>
                           
@@ -254,10 +254,10 @@ export function NotificationFeed() {
                             {notification.severity && (
                               <Badge variant="outline" className={`text-xs px-2 py-1 font-medium ${
                                 notification.severity === 'HIGH' 
-                                  ? 'bg-red-50 dark:bg-red-950/20 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800' 
+                                  ? 'bg-black dark:bg-white text-white dark:text-black border-transparent' 
                                   : notification.severity === 'MEDIUM'
-                                  ? 'bg-amber-50 dark:bg-amber-950/20 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800'
-                                  : 'bg-blue-50 dark:bg-blue-950/20 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800'
+                                  ? 'bg-gray-200 dark:bg-gray-800 text-black dark:text-white border-transparent'
+                                  : 'bg-white dark:bg-black text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-800'
                               }`}>
                                 {notification.severity}
                               </Badge>
@@ -316,7 +316,7 @@ export function NotificationFeed() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="h-7 px-2 text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-200 hover:bg-blue-50 dark:hover:bg-blue-950/20"
+                            className="h-7 px-2 text-xs text-black dark:text-white hover:bg-gray-100 dark:hover:bg-gray-800 underline underline-offset-2"
                             onClick={(e) => {
                               e.stopPropagation()
                               handleViewDetails(notification)
@@ -397,8 +397,8 @@ export function NotificationFeed() {
               onClick={() => setActiveMainTab(tab.id)}
               className={`relative px-4 py-2 rounded-md font-medium transition-colors duration-200 ${
                 activeMainTab === tab.id
-                  ? "bg-blue-500 text-white"
-                  : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
+                  ? "bg-black text-white dark:bg-white dark:text-black"
+                  : "text-gray-600 dark:text-gray-400 hover:text-black dark:hover:text-white"
               }`}
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
@@ -474,10 +474,10 @@ export function NotificationFeed() {
                   {selectedNotification.severity && (
                     <Badge variant="outline" className={`text-xs px-2 py-0.5 ${
                       selectedNotification.severity === 'HIGH' 
-                        ? 'bg-red-50 dark:bg-red-950/20 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800' 
+                        ? 'bg-black dark:bg-white text-white dark:text-black border-transparent' 
                         : selectedNotification.severity === 'MEDIUM'
-                        ? 'bg-amber-50 dark:bg-amber-950/20 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800'
-                        : 'bg-blue-50 dark:bg-blue-950/20 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800'
+                        ? 'bg-gray-200 dark:bg-gray-800 text-black dark:text-white border-transparent'
+                        : 'bg-white dark:bg-black text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-800'
                     }`}>
                       {selectedNotification.severity}
                     </Badge>
@@ -527,10 +527,10 @@ export function NotificationFeed() {
                           <h4 className="font-medium text-gray-900 dark:text-gray-100 mb-3">Risk Relationships ({citations.relationships.length})</h4>
                           <div className="space-y-3">
                             {citations.relationships.map((relationship, idx) => (
-                              <div key={idx} className="bg-orange-50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-800 rounded-lg p-4">
+                              <div key={idx} className="bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-4">
                                 <div className="flex items-center gap-2 mb-2">
-                                  <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
-                                  <span className="font-medium text-orange-700 dark:text-orange-300 text-sm">
+                                  <div className="w-2 h-2 bg-black dark:bg-white rounded-full"></div>
+                                  <span className="font-medium text-black dark:text-white text-sm">
                                     {Math.round(relationship.strength * 100)}% Impact Strength
                                   </span>
                                 </div>
@@ -559,7 +559,7 @@ export function NotificationFeed() {
                           <h4 className="font-medium text-gray-900 dark:text-gray-100 mb-3">Affected Entities ({citations.affectedEntities.length})</h4>
                           <div className="flex flex-wrap gap-2">
                             {citations.affectedEntities.map((entity, idx) => (
-                              <div key={idx} className="inline-flex items-center px-3 py-1.5 text-sm bg-blue-50 dark:bg-blue-950/20 text-blue-700 dark:text-blue-300 rounded-md border border-blue-200 dark:border-blue-800">
+                              <div key={idx} className="inline-flex items-center px-3 py-1.5 text-sm bg-gray-100 dark:bg-gray-800 text-black dark:text-white rounded-md border border-gray-200 dark:border-gray-700">
                                 <MapPin className="w-3 h-3 mr-1" />
                                 {entity}
                               </div>

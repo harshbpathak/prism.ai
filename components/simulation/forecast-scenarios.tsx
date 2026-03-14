@@ -27,8 +27,8 @@ import { useUser } from "@/lib/stores/user"
 import { scenarioCache } from "@/lib/utils/scenario-cache"
 import { toast } from "sonner"
 
-// Enhanced Glassmorphic Card Component
-function GlassmorphicCard({ 
+// Minimalist Card Component
+function MinimalCard({ 
   children, 
   className = "", 
   ...props 
@@ -40,7 +40,7 @@ function GlassmorphicCard({
   return (
     <Card 
       className={cn(
-        "border border-white/30 dark:border-slate-700/10 bg-white/70 dark:bg-slate-950/50 backdrop-blur-xl shadow-xl shadow-black/5 dark:shadow-black/20 rounded-xl transition-all duration-300 hover:shadow-2xl hover:bg-white/80 dark:hover:bg-slate-950/70",
+        "border border-slate-200 dark:border-slate-800 bg-white dark:bg-black shadow-sm rounded-xl transition-all duration-300",
         className
       )} 
       {...props}
@@ -195,7 +195,7 @@ export function ForecastScenarios({ onSelectScenario }: ForecastScenariosProps) 
 
   if (!selectedSupplyChainId) {
     return (
-      <GlassmorphicCard className="text-center py-8">
+      <MinimalCard className="text-center py-8">
         <CardContent>
           <Network className="w-12 h-12 text-slate-400 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-slate-900 dark:text-slate-100 mb-2">
@@ -227,9 +227,9 @@ export function ForecastScenarios({ onSelectScenario }: ForecastScenariosProps) 
             </div>
           )}
         </CardContent>
-      </GlassmorphicCard>
-    )
-  }
+    </MinimalCard>
+  )
+}
 
   return (
     <div className="space-y-6">
@@ -313,7 +313,7 @@ export function ForecastScenarios({ onSelectScenario }: ForecastScenariosProps) 
       {isLoading && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {[1, 2, 3, 4].map((i) => (
-            <GlassmorphicCard key={i} className="animate-pulse">
+            <MinimalCard key={i} className="animate-pulse">
               <CardHeader>
                 <div className="flex items-center gap-3">
                   <div className="w-8 h-8 bg-slate-200 dark:bg-slate-700 rounded-lg"></div>
@@ -333,7 +333,7 @@ export function ForecastScenarios({ onSelectScenario }: ForecastScenariosProps) 
                   </div>
                 </div>
               </CardContent>
-            </GlassmorphicCard>
+            </MinimalCard>
           ))}
         </div>
       )}
@@ -345,7 +345,7 @@ export function ForecastScenarios({ onSelectScenario }: ForecastScenariosProps) 
             const TypeIcon = getTypeIcon(scenario.scenarioType)
             
             return (
-              <GlassmorphicCard 
+              <MinimalCard 
                 key={index} 
                 className="group cursor-pointer relative overflow-hidden"
                 onClick={() => onSelectScenario(scenario)}
@@ -418,7 +418,7 @@ export function ForecastScenarios({ onSelectScenario }: ForecastScenariosProps) 
                     Use This Scenario
                   </Button>
                 </CardFooter>
-              </GlassmorphicCard>
+              </MinimalCard>
             )
           })}
         </div>
@@ -426,7 +426,7 @@ export function ForecastScenarios({ onSelectScenario }: ForecastScenariosProps) 
 
       {/* Empty State */}
       {!isLoading && scenarios.length === 0 && (
-        <GlassmorphicCard className="text-center py-12">
+        <MinimalCard className="text-center py-12">
           <CardContent>
             <Brain className="w-16 h-16 text-slate-400 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-slate-900 dark:text-slate-100 mb-2">
@@ -444,7 +444,7 @@ export function ForecastScenarios({ onSelectScenario }: ForecastScenariosProps) 
               Check Again
             </Button>
           </CardContent>
-        </GlassmorphicCard>
+        </MinimalCard>
       )}
     </div>
   )

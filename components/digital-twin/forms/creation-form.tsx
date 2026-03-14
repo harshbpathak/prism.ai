@@ -154,7 +154,7 @@ export default function CreationForm({ onSuccess, onCancel }: CreationFormProps)
           ease: [0.4, 0.0, 0.2, 1],
           layout: { duration: 0.4 }
         }}
-        className="bg-slate-50 dark:bg-slate-900/50 rounded-2xl shadow-2xl shadow-slate-400/20 dark:shadow-black/50 border border-slate-200/80 dark:border-slate-700/60"
+        className="bg-blue-50/80 dark:bg-slate-900/50 rounded-2xl shadow-2xl shadow-slate-400/20 dark:shadow-black/50 border border-slate-200/80 dark:border-slate-700/60"
       >
         {/* Simplified Header */}
         <div className="px-6 pt-5 pb-2">

@@ -37,7 +37,7 @@ export function Footer() {
       <div className="max-w-[1400px] mx-auto px-8">
         <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_auto] md:pr-16 gap-12 md:gap-24">
           
-          {/* Brand and Copyright */}
+          {}
           <div>
             <div className="flex items-center gap-2.5 mb-4 group">
               <div className="relative flex items-center justify-center p-2 rounded-xl bg-gradient-to-br from-[#2563EB]/10 to-[#7C3AED]/10 border border-[#2563EB]/15 shadow-[0_2px_12px_rgba(37,99,235,0.1)]">
@@ -46,15 +46,17 @@ export function Footer() {
                   <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
                 </svg>
               </div>
-              <h2 className="text-[22px] font-[700] text-[#0F172A] tracking-tight">PRISM</h2>
+              <h2 className="text-[22px] font-[700] text-[#0F172A] tracking-tight">PRISM 
+                (PRODUCT ROUTE INTELLIGENCE AND SUPPLY MAPPING)
+              </h2>
             </div>
             <p className="text-[14px] font-[400] text-[#64748B] max-w-xs leading-relaxed">
-              Empowering global supply chains with autonomous AI and digital twin resilience.
+              Empowering global supply chains with autonomous AI and digital twin resilience for risk mitigation and supply chain optimization.
             </p>
           </div>
 
           <div className="flex gap-16 md:gap-32 md:ml-auto flex-wrap">
-            {/* Resources */}
+            {}
             <div>
               <h3 className="text-[15px] font-[600] text-[#0F172A] mb-6">Resources</h3>
               <ul className="space-y-3.5">
@@ -64,7 +66,7 @@ export function Footer() {
               </ul>
             </div>
 
-            {/* Platform */}
+            {}
             <div>
               <h3 className="text-[15px] font-[600] text-[#0F172A] mb-6">Platform</h3>
               <ul className="space-y-3.5">
@@ -77,10 +79,10 @@ export function Footer() {
           </div>
         </div>
 
-        {/* Bottom Bar */}
+        {}
         <div className="mt-20 pt-8 border-t border-black/[0.04] flex flex-col md:flex-row justify-between items-center gap-4">
           <p className="text-[14px] text-[#94A3B8]">© {new Date().getFullYear()} PRISM Systems. All rights reserved.</p>
-          <p className="text-[14px] text-[#94A3B8]">Developed by <span className="font-medium text-[#64748B]">Team Innovisonaries</span></p>
+          <p className="text-[14px] text-[#94A3B8]">Developed by <span className="font-medium text-[#64748B]">STACK OVERFLOWED</span></p>
         </div>
       </div>
     </footer>
