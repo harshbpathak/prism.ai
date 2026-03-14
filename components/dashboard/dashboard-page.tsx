@@ -1,116 +1,107 @@
 "use client"
 
-import { AlertTriangle, Clock, Gauge, TrendingUp } from "lucide-react"
+import { AlertTriangle, Clock, Gauge, TrendingUp, Activity, ArrowUpRight, ArrowDownRight, ChevronRight, Cpu, Radio, Layers } from "lucide-react"
 import Link from "next/link"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { NotificationFeed } from "@/components/dashboard/notification-feed"
 
 export default function DashboardPage() {
   return (
-    <div className="relative min-h-full flex-1 bg-gradient-to-br from-indigo-100 via-purple-50 to-cyan-100 dark:from-gray-900 dark:to-slate-900 overflow-x-hidden">
-      {/* Enhanced background blurred elements for light mode */}
-      <div className="absolute top-1/4 left-1/4 w-64 h-64 rounded-full bg-gradient-to-br from-purple-400 to-pink-400 dark:bg-purple-900 opacity-30 blur-3xl animate-pulse"></div>
-      <div className="absolute bottom-1/3 right-1/3 w-96 h-96 rounded-full bg-gradient-to-br from-blue-400 to-cyan-400 dark:bg-blue-900 opacity-25 blur-3xl"></div>
-      <div className="absolute top-1/2 right-1/4 w-48 h-48 rounded-full bg-gradient-to-br from-emerald-300 to-teal-400 dark:bg-emerald-900 opacity-20 blur-2xl"></div>
-      <div className="absolute bottom-1/4 left-1/3 w-72 h-72 rounded-full bg-gradient-to-br from-orange-300 to-amber-400 dark:bg-orange-900 opacity-15 blur-3xl animate-pulse"></div>
-      
-      <div className="relative flex flex-col gap-6 p-6 md:gap-8 md:p-8 max-w-full">
-        <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-          <div>
-            <h1 className="text-4xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-400 dark:to-indigo-400">Dashboard</h1>
-            <p className="text-slate-600 dark:text-slate-300">Welcome to your Supply Chain Resilience Planner dashboard.</p>
-          </div>
-        </div>
+    <div className="relative min-h-full flex-1 bg-white dark:bg-black overflow-hidden text-black dark:text-white">
+      <div className="flex h-full">
 
-        <div className="flex flex-col gap-4 md:flex-row">
-          <div className="grid flex-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <GlassmorphicKpiCard
-              title="Risk Score"
-              value="0%"
-              trend="0%"
-              trendDirection="down"
-              icon={<Gauge className="h-5 w-5" />}
-              description="Overall supply chain risk"
-                          />
-            <GlassmorphicKpiCard
-              title="Recovery Time"
-              value="0 days"
-              trend="0"
-              trendDirection="down"
-              icon={<Clock className="h-5 w-5" />}
-              description="Average time to recover"
-            />
-            <GlassmorphicKpiCard
-              title="Active Disruptions"
-              value="0"
-              trend="0"
-              trendDirection="down"
-              icon={<AlertTriangle className="h-5 w-5" />}
-              description="Current disruptions"
-            />
-            <GlassmorphicKpiCard
-              title="ROI Estimate"
-              value="$0"
-              trend="0%"
-              trendDirection="down"
-              icon={<TrendingUp className="h-5 w-5" />}
-              description="Estimated annual savings"
-            />
+        {/* Left Sidebar — System Status */}
+        <aside className="w-64 shrink-0 border-r border-slate-200 dark:border-slate-800 flex flex-col divide-y divide-slate-200 dark:divide-slate-800">
+          <div className="p-5">
+            <p className="text-[10px] uppercase tracking-[0.18em] text-slate-400 font-semibold mb-4">System Status</p>
+            <div className="space-y-4">
+              <StatRow icon={<Gauge className="w-4 h-4" />} label="Exposure Index" value="—" note="No data" />
+              <StatRow icon={<Clock className="w-4 h-4" />} label="Mean Recovery" value="—" note="No data" />
+              <StatRow icon={<AlertTriangle className="w-4 h-4" />} label="Active Faults" value="0" note="All clear" />
+              <StatRow icon={<TrendingUp className="w-4 h-4" />} label="Net Yield Gain" value="—" note="Pending" />
+            </div>
           </div>
-        </div>
 
-        <div className="w-full">
-          {/* Notification Feed with integrated tabs */}
-          <GlassmorphicCard className="border-0 min-h-[600px]">
+          <div className="p-5 flex-1">
+            <p className="text-[10px] uppercase tracking-[0.18em] text-slate-400 font-semibold mb-3">Node Health</p>
+            <div className="space-y-2">
+              {["Origin Nodes", "Transit Hubs", "Distribution", "End Points"].map((label, i) => (
+                <div key={label} className="flex items-center justify-between">
+                  <span className="text-xs text-slate-500">{label}</span>
+                  <span className="text-[10px] px-1.5 py-0.5 bg-slate-100 dark:bg-slate-900 text-slate-400 rounded">–</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </aside>
+
+        {/* Main Content */}
+        <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+          {/* Top bar */}
+          <div className="border-b border-slate-200 dark:border-slate-800 px-6 py-4 flex items-center justify-between shrink-0">
+            <div>
+              <h1 className="text-base font-semibold tracking-tight text-black dark:text-white">Control Center</h1>
+              <p className="text-xs text-slate-400 mt-0.5">Operational intelligence overview</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+              <span className="text-xs text-slate-400">Live</span>
+            </div>
+          </div>
+
+          {/* KPI Strip */}
+          <div className="grid grid-cols-4 divide-x divide-slate-200 dark:divide-slate-800 border-b border-slate-200 dark:border-slate-800 shrink-0">
+            <KpiBlock label="Node Exposure" value="0%" delta={null} />
+            <KpiBlock label="Recovery Window" value="—" delta={null} />
+            <KpiBlock label="Fault Signals" value="0" delta={null} positive />
+            <KpiBlock label="Estimated Savings" value="$0" delta={null} />
+          </div>
+
+          {/* Feed area */}
+          <div className="flex-1 overflow-y-auto">
             <NotificationFeed />
-          </GlassmorphicCard>
+          </div>
         </div>
       </div>
     </div>
   )
 }
 
-// Glassmorphic Card Component
-function GlassmorphicCard({ children, className = "", ...props }: { children: React.ReactNode; className?: string; [key: string]: any }) {
+function StatRow({ icon, label, value, note }: { icon: React.ReactNode; label: string; value: string; note: string }) {
   return (
-    <Card 
-      className={`border border-white/30 dark:border-slate-700/10 bg-white/70 dark:bg-slate-900/5 backdrop-blur-xl shadow-xl shadow-black/5 dark:shadow-black/20 rounded-xl ${className}`} 
-      {...props}
-    >
-      {children}
-    </Card>
-  )
-}
-
-// Glassmorphic KPI Card Component
-  function GlassmorphicKpiCard({ title, value, trend, trendDirection, icon, description }: {
-  title: string;
-  value: string;
-  trend: string;
-  trendDirection: "up" | "down";
-  icon: React.ReactNode;
-  description: string;
-}) {
-  return (
-      <div className="block group">
-      <GlassmorphicCard className="h-full overflow-hidden transition-all duration-300 hover:shadow-2xl hover:scale-105 hover:bg-white/80 dark:hover:bg-slate-900/10 border-gradient-to-r from-purple-200/50 to-blue-200/50">
-        <CardHeader className="pb-2">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-sm font-medium text-slate-700 dark:text-slate-400">{title}</CardTitle>
-            <span className="rounded-full bg-gradient-to-br from-indigo-100 to-purple-100 dark:bg-gradient-to-br dark:from-slate-700 dark:to-slate-600 p-1.5 backdrop-blur-sm shadow-md text-slate-600 dark:text-slate-200">{icon}</span>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold bg-gradient-to-r from-slate-800 to-slate-600 dark:from-white dark:to-slate-100 bg-clip-text text-transparent">{value}</div>
-          <div className="mt-1 flex items-center text-xs">
-            <span className={trendDirection === "up" ? "text-red-600 dark:text-red-400 font-semibold" : "text-emerald-600 dark:text-green-400 font-semibold"}>
-              {trend}
-            </span>
-            <span className="ml-2 text-slate-700 dark:text-slate-400">{description}</span>
-          </div>
-        </CardContent>
-      </GlassmorphicCard>
+    <div className="flex items-start gap-3">
+      <span className="text-slate-400 mt-0.5">{icon}</span>
+      <div className="min-w-0">
+        <p className="text-[11px] text-slate-500 truncate">{label}</p>
+        <div className="flex items-center gap-1.5">
+          <span className="text-sm font-semibold text-black dark:text-white">{value}</span>
+          <span className="text-[10px] text-slate-400">{note}</span>
+        </div>
+      </div>
     </div>
   )
 }
 
+function NavLink({ href, icon, label }: { href: string; icon: React.ReactNode; label: string }) {
+  return (
+    <Link href={href} className="flex items-center gap-2 px-2 py-1.5 rounded text-xs text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-900 hover:text-black dark:hover:text-white transition-colors group">
+      <span className="text-slate-400 group-hover:text-black dark:group-hover:text-white transition-colors">{icon}</span>
+      {label}
+      <ChevronRight className="w-3 h-3 ml-auto opacity-0 group-hover:opacity-100 transition-opacity" />
+    </Link>
+  )
+}
+
+function KpiBlock({ label, value, delta, positive }: { label: string; value: string; delta: string | null; positive?: boolean }) {
+  return (
+    <div className="px-5 py-4">
+      <p className="text-[10px] uppercase tracking-wider text-slate-400 mb-1">{label}</p>
+      <p className="text-xl font-bold text-black dark:text-white">{value}</p>
+      {delta && (
+        <div className="flex items-center gap-1 mt-1">
+          {positive ? <ArrowDownRight className="w-3 h-3 text-green-500" /> : <ArrowUpRight className="w-3 h-3 text-red-500" />}
+          <span className={`text-[11px] ${positive ? 'text-green-600' : 'text-red-500'}`}>{delta}</span>
+        </div>
+      )}
+    </div>
+  )
+}
