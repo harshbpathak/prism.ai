@@ -45,16 +45,15 @@ export default function MainLayout({
           .from('users')
           .select('*')
           .eq('email', user.email)
-          .single()
+          .maybeSingle()
 
         if (error) {
           console.log('⚠️ Error fetching user data:', error)
         }
 
         // Only redirect if critical fields are completely missing
-        // Skip profile check for strategy pages and main dashboard during development
-        const skipProfileCheck = pathname.includes('/strategy') || 
-                                pathname.includes('/dashboard') || 
+        // Skip profile check for main dashboard during development
+        const skipProfileCheck = pathname.includes('/dashboard') || 
                                 pathname.includes('/digital-twin') ||
                                 pathname.includes('/simulation') ||
                                 pathname.includes('/orchestrator')
@@ -108,10 +107,10 @@ export default function MainLayout({
       <div className={`h-full w-full`}>
         <SidebarProvider>
           <div className="flex flex-col h-screen w-full overflow-hidden">
+            <AppSidebar />
             <main className="flex-1 min-h-0 flex flex-col overflow-auto bg-background">
               {children}
             </main>
-            <AppSidebar />
           </div>
 
           <Toaster />

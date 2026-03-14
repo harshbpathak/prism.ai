@@ -91,11 +91,6 @@ export function ISCAChat() {
       description: "Manage and create supply chain digital twins"
     },
     {
-      name: "Strategy",
-      path: "/strategy", 
-      description: "Strategic planning and analysis tools"
-    },
-    {
       name: "Simulation",
       path: "/simulation",
       description: "Run supply chain simulations and scenarios"
@@ -281,7 +276,7 @@ export function ISCAChat() {
       {
         name: "pagePath",
         type: "string",
-        description: "The path to navigate to (e.g., '/dashboard', '/digital-twin', '/strategy', '/simulation', '/profile')",
+        description: "The path to navigate to (e.g., '/dashboard', '/digital-twin', '/simulation', '/profile')",
         required: true
       }
     ],
@@ -569,8 +564,6 @@ function getPageNameFromPath(pathname: string): string {
         return "Supply Chain View";
       }
       return "Digital Twin";
-    case 'strategy':
-      return "Strategy";
     case 'simulation':
       if (pathSegments[1] === 'result') {
         return "Simulation Results";
