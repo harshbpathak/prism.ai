@@ -48,18 +48,18 @@ export function TimelineSteps() {
       >
         <div className="inline-flex items-center justify-center px-4 py-1.5 mb-6 rounded-full bg-[rgba(37,99,235,0.08)] border border-[rgba(37,99,235,0.2)]">
           <span className="text-[#2563EB] text-[11px] font-[600] uppercase tracking-[0.12em]">
-            HOW IT WORKS
+            PLATFORM OVERVIEW
           </span>
         </div>
         
         <h2 className="text-[44px] md:text-[48px] font-[700] tracking-[-0.02em] text-[#0F172A] mb-6 leading-tight">
           <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#2563EB] to-[#7C3AED]">
-            AI-Powered
-          </span> Supply Chain Intelligence
+            Precision-Grade
+          </span> Network Intelligence
         </h2>
         
         <p className="text-[18px] md:text-[20px] font-[400] text-[#64748B] leading-[1.7] max-w-3xl mx-auto">
-          Transform disruptions into opportunities with our comprehensive process that combines AI intelligence with real-world supply chain expertise.
+          Map, stress-test, and harden your operational networks with a unified platform engineered for proactive resilience — not reactive damage control.
         </p>
       </motion.div>
 
@@ -78,9 +78,9 @@ export function TimelineSteps() {
             <div className={iconBaseClasses}>
               <GitBranch className="w-6 h-6 text-[#2563EB]" />
             </div>
-            <h3 className="text-[16px] font-[600] text-[#0F172A] mb-3">Digital Twin Mapping</h3>
+            <h3 className="text-[16px] font-[600] text-[#0F172A] mb-3">Network Graph Construction</h3>
             <p className="text-[14px] font-[400] text-[#64748B] leading-relaxed">
-              Build interactive supply chain networks with comprehensive visibility into every tier of your supplier ecosystem. Pinpoint vulnerabilities before they manifest into critical bottlenecks.
+              Model your entire operational network as a live, interactive graph — capturing every supplier tier, logistics route, and distribution node. Expose hidden single points of failure before they cascade into costly shutdowns.
             </p>
           </motion.div>
 
@@ -94,9 +94,9 @@ export function TimelineSteps() {
             <div className={iconBaseClasses}>
               <Zap className="w-6 h-6 text-[#2563EB]" />
             </div>
-            <h3 className="text-[16px] font-[600] text-[#0F172A] mb-3">Disruption Simulation</h3>
+            <h3 className="text-[16px] font-[600] text-[#0F172A] mb-3">Fault Injection Probes</h3>
             <p className="text-[14px] font-[400] text-[#64748B] leading-relaxed">
-              AI-powered scenario modeling for macro events and micro supplier failures.
+              Inject targeted fault vectors — port closures, supplier insolvencies, demand spikes — and observe how failures propagate across your entire network in real time.
             </p>
           </motion.div>
 
@@ -110,9 +110,9 @@ export function TimelineSteps() {
             <div className={iconBaseClasses}>
               <BarChart2 className="w-6 h-6 text-[#2563EB]" />
             </div>
-            <h3 className="text-[16px] font-[600] text-[#0F172A] mb-3">Impact Assessment</h3>
+            <h3 className="text-[16px] font-[600] text-[#0F172A] mb-3">Cascade Impact Analysis</h3>
             <p className="text-[14px] font-[400] text-[#64748B] leading-relaxed">
-              Real-time analytics and insights tracking cascading financial and operational impacts.
+              Quantify downstream damage in real time — financial exposure, operational slowdown, and SLA breach risk — before a single shipment is touched.
             </p>
           </motion.div>
         </div>
@@ -129,13 +129,13 @@ export function TimelineSteps() {
             <Zap className="w-48 h-48" />
           </div>
           
-          <h3 className="text-[20px] font-[600] text-[#0F172A] mb-4 relative z-10">Smart Strategies</h3>
+          <h3 className="text-[20px] font-[600] text-[#0F172A] mb-4 relative z-10">Autonomous Response Engine</h3>
           <p className="text-[14px] font-[400] text-[#64748B] mb-8 leading-relaxed relative z-10">
-            When disruptions occur, our AI autonomous agents instantly generate tactical recovery plans to minimize financial damage and protect service levels.
+            The moment a disruption is detected, our AI agents autonomously generate ranked recovery playbooks — ranked by cost, speed, and strategic fit for your operation.
           </p>
 
           <ul className="space-y-4 mb-auto relative z-10">
-            {['AI Recommendations', 'ROI Optimization', 'Alternative Routes', 'Risk Mitigation'].map((item, i) => (
+            {['Ranked Recovery Playbooks', 'Cost-Yield Optimization', 'Rerouting Intelligence', 'Exposure Containment'].map((item, i) => (
               <li key={i} className="flex items-center gap-3">
                 <div className="flex-shrink-0 w-5 h-5 rounded-full bg-gradient-to-r from-[#2563EB] to-[#7C3AED] flex items-center justify-center p-[4px]">
                   <ArrowRight className="w-full h-full text-white" />
@@ -151,7 +151,7 @@ export function TimelineSteps() {
               onClick={(e) => smoothScroll(e, 'features')}
               className="inline-flex items-center text-[15px] font-[600] text-[#2563EB] hover:text-[#7C3AED] transition-colors group"
             >
-              Learn more 
+              Explore capabilities 
               <span className="ml-1 inline-block transform group-hover:translate-x-1 transition-transform">&rarr;</span>
             </a>
           </div>
@@ -167,7 +167,7 @@ export function TimelineSteps() {
         className="flex justify-center"
       >
         <GlowyButton href="/dashboard" className="px-10 py-4 text-base">
-          See It In Action &rarr;
+          Launch the Platform &rarr;
         </GlowyButton>
       </motion.div>
 
@@ -175,4 +175,4 @@ export function TimelineSteps() {
   );
 }
 
-export default TimelineSteps;
+export default TimelineSteps;
