@@ -19,25 +19,25 @@
 // ⚠️  Quota guide (free tier):
 //   gemini-2.5-flash  →   50 RPD  (premium quality, use sparingly)
 //   gemini-2.0-flash  → 1,500 RPD (good quality, high limit)
-//   gemini-2.0-flash-lite → 1,500 RPD (fastest, cheapest)
+//   gemini-1.5-flash  → 1,500 RPD (stable high-quota fallback)
 //
 // Each orchestrator request = up to 8 API calls internally, so keep
-// agent/suggestions models on 2.0-flash to avoid hitting quota fast.
+// agent/suggestions models on high-quota models to avoid hitting quota fast.
 
 export const AI_MODELS = {
   /** Main chat model – used for CopilotKit chat & primary responses */
-  chat: 'gemini-2.0-flash-lite',
+  chat: 'gemini-2.5-flash',
   /** Lightweight chat model – used when speed/cost matters */
-  chatLite: 'gemini-2.0-flash-lite',
+  chatLite: 'gemini-2.5-flash',
   /** Agent analysis model – used for strategy, scenario, impact, info agents */
-  agents: 'gemini-2.0-flash-lite',
+  agents: 'gemini-2.5-flash',
   /** Suggestions model – used for background supply chain suggestions */
-  suggestions: 'gemini-2.0-flash-lite',
+  suggestions: 'gemini-2.5-flash',
 } as const;
 
 // ─── Module Types ─────────────────────────────────────────────────────────────
 
-export type AIModule = 'orchestrator' | 'agents' | 'suggestions' | 'chat-lite' | 'default';
+export type AIModule = 'orchestrator' | 'agents' | 'suggestions' | 'chat-lite' | 'digital-twin' | 'default';
 
 // ─── API Key Resolution ───────────────────────────────────────────────────────
 
@@ -51,6 +51,8 @@ export function getAIKeyForModule(module: AIModule): string {
   switch (module) {
     case 'orchestrator':
       return process.env.GOOGLE_API_KEY_ORCHESTRATOR || mainKey;
+    case 'digital-twin':
+      return process.env.GOOGLE_API_KEY_DIGITAL_TWIN || mainKey;
     case 'agents':
     case 'chat-lite':
       return process.env.GOOGLE_API_KEY_AGENTS || mainKey;
@@ -79,6 +81,10 @@ export function getAIConfig(module: AIModule = 'default') {
 export function getCopilotKitConfig(endpoint: 'chat' | 'digital-twin' | 'lite') {
   switch (endpoint) {
     case 'digital-twin':
+      return {
+        model: AI_MODELS.chatLite,
+        apiKey: getAIKeyForModule('digital-twin'),
+      };
     case 'lite':
       return {
         model: AI_MODELS.chatLite,

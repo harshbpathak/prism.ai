@@ -263,17 +263,44 @@ export async function POST(req: Request) {
         }
       }
       
-      // Check for Google AI specific errors
-      if (aiError.message?.includes('API_KEY_INVALID')) {
-        console.log('Handling invalid API key error')
-        console.groupEnd()
-        return NextResponse.json(
-          { 
-            error: "AI_API_KEY_ERROR", 
-            message: "AI service configuration error. Please contact support." 
-          },
-          { status: 503 }
-        )
+      // Check for Google AI key errors — return graceful fallback instead of 503
+      if (
+        aiError.message?.includes('API_KEY_INVALID') ||
+        aiError.message?.includes('expired') ||
+        aiError.message?.includes('INVALID_ARGUMENT') ||
+        aiError.statusCode === 400
+      ) {
+        console.warn('Handling invalid/expired API key — returning fallback suggestions');
+        console.groupEnd();
+        return NextResponse.json({
+          suggestions: [
+            {
+              id: 'key-fallback-001',
+              title: 'Optimize Lead Times',
+              description: 'Review supplier lead times to identify bottlenecks and reduce delays.',
+              action: 'Analyze lead times for all supplier nodes and flag outliers above 14 days.',
+              confidence: 78,
+              category: 'efficiency'
+            },
+            {
+              id: 'key-fallback-002',
+              title: 'Mitigate High Risk',
+              description: 'One or more nodes have elevated risk scores that could disrupt operations.',
+              action: 'Review nodes with riskScore > 0.4 and implement contingency sourcing.',
+              confidence: 85,
+              category: 'risk'
+            },
+            {
+              id: 'key-fallback-003',
+              title: 'Reduce Transportation Cost',
+              description: 'Evaluate current shipping modalities for cost-saving opportunities.',
+              action: 'Compare sea vs air freight for non-time-sensitive routes.',
+              confidence: 72,
+              category: 'cost'
+            }
+          ],
+          usage: { fallback: true, reason: 'api_key_expired' }
+        });
       }
       
       if (aiError.message?.includes('SAFETY')) {

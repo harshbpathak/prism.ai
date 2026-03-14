@@ -156,10 +156,10 @@ export async function testStrategyAgentPOST(simulationId: string = MOCK_STRATEGY
     
     const result = await response.json()
     
-    console.log('✅ Strategy Agent POST Test Result:', result)
+    console.log(' Strategy Agent POST Test Result:', result)
     return result
   } catch (error) {
-    console.error('❌ Strategy Agent POST Test Failed:', error)
+    console.error(' Strategy Agent POST Test Failed:', error)
     throw error
   }
 }
@@ -170,7 +170,7 @@ export function validateStrategyResult(result: any): boolean {
   
   for (const field of requiredFields) {
     if (!result[field]) {
-      console.error(`❌ Missing required field: ${field}`)
+      console.error(` Missing required field: ${field}`)
       return false
     }
   }
@@ -183,13 +183,13 @@ export function validateStrategyResult(result: any): boolean {
     
     for (const field of requiredStrategyFields) {
       if (!strategy[field]) {
-        console.error(`❌ Strategy missing required field: ${field}`)
+        console.error(` Strategy missing required field: ${field}`)
         return false
       }
     }
   }
   
-  console.log('✅ Strategy result validation passed')
+  console.log('Strategy result validation passed')
   return true
 }
 

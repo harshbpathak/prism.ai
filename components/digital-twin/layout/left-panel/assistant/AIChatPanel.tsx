@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { useQueryState } from 'nuqs';
 import { Button } from "@/components/ui/button";
 import { Trash2 } from "lucide-react";
+import { useUser } from '@/lib/stores/user';
 
 // Import our smaller components
 import { ImmersiveHeader } from './ImmersiveHeader';
@@ -71,6 +72,9 @@ const AIChatPanel: React.FC<AIChatPanelProps> = ({
   // Track if we've loaded from storage to prevent re-loading
   const [hasLoadedFromStorage, setHasLoadedFromStorage] = useState(false);
 
+  // Get logged-in user for Supabase suggestion persistence
+  const { userData } = useUser();
+
   // Get URL state to read current canvas data
   const [archParam] = useQueryState('arch', {
     defaultValue: '',
@@ -92,28 +96,28 @@ const AIChatPanel: React.FC<AIChatPanelProps> = ({
     const decodeFromURL = async () => {
       if (archParam) {
         try {
-          console.log('🔍 AI Chat Panel: Decompressing canvas state from URL');
+          console.log(' AI Chat Panel: Decompressing canvas state from URL');
           const canvasData = decompressArchData(archParam);
 
           if (canvasData.nodes && canvasData.edges) {
-            console.log('🔍 AI Chat Panel: Setting nodes and edges from URL', {
+            console.log(' AI Chat Panel: Setting nodes and edges from URL', {
               nodesCount: canvasData.nodes.length,
               edgesCount: canvasData.edges.length
             });
             setUrlNodes(canvasData.nodes);
             setUrlEdges(canvasData.edges);
           } else {
-            console.log('🔍 AI Chat Panel: No canvas data in URL, using empty arrays');
+            console.log(' AI Chat Panel: No canvas data in URL, using empty arrays');
             setUrlNodes([]);
             setUrlEdges([]);
           }
         } catch (error) {
-          console.error('❌ AI Chat Panel: Failed to decode canvas state from URL:', error);
+          console.error(' AI Chat Panel: Failed to decode canvas state from URL:', error);
           setUrlNodes([]);
           setUrlEdges([]);
         }
       } else {
-        console.log('🔍 AI Chat Panel: No URL parameter, using empty arrays');
+        console.log(' AI Chat Panel: No URL parameter, using empty arrays');
         setUrlNodes([]);
         setUrlEdges([]);
       }
@@ -190,65 +194,8 @@ const AIChatPanel: React.FC<AIChatPanelProps> = ({
     }
   }, [twinId, messages, hasLoadedFromStorage, saveChatToStorage]);
 
-  // Intercept fetch requests to catch GraphQL errors
-  useEffect(() => {
-    const originalFetch = window.fetch;
-    
-    window.fetch = async (...args) => {
-      try {
-        const response = await originalFetch(...args);
-        
-        // Check if this is a CopilotKit API request
-        const url = args[0] as string;
-        if (url?.includes('/api/copilotkit') || url?.includes('copilot')) {
-          // console.log('🔍 Intercepted CopilotKit request:', url);
-          
-          // Clone response to read it without consuming the original
-          const responseClone = response.clone();
-          
-          try {
-            const responseText = await responseClone.text();
-            console.log('🔍 CopilotKit response text:', responseText);
-            
-            // Try to parse as JSON
-            if (responseText) {
-              try {
-                const responseJson = JSON.parse(responseText);
-                console.log('🔍 CopilotKit response JSON:', responseJson);
-                
-                // Check for GraphQL errors
-                if (responseJson.errors && Array.isArray(responseJson.errors)) {
-                  console.log('🚨 GraphQL errors detected:', responseJson.errors);
-                  // Handle the error after a small delay to let CopilotKit process
-                  setTimeout(() => {
-                    handleChatError(responseJson);
-                  }, 100);
-                }
-              } catch (parseError) {
-                console.log('🔍 Response is not JSON:', parseError);
-              }
-            }
-          } catch (readError) {
-            console.log('🔍 Could not read response:', readError);
-          }
-        }
-        
-        return response;
-      } catch (fetchError) {
-        console.error('🚨 Fetch error caught:', fetchError);
-        // Handle fetch errors
-        if (args[0] && (args[0] as string).includes('copilot')) {
-          handleChatError(fetchError);
-        }
-        throw fetchError;
-      }
-    };
-
-    // Cleanup function to restore original fetch
-    return () => {
-      window.fetch = originalFetch;
-    };
-  }, []);
+  // Note: Removed window.fetch interceptor — it was reading the response body twice (bug)
+  // and logging verbose CopilotKit internals unnecessarily.
 
   // Use our custom hooks
   const { } = useCopilotActions({
@@ -287,19 +234,12 @@ const AIChatPanel: React.FC<AIChatPanelProps> = ({
   } = useAISuggestions({
     nodes,
     edges,
-    messages
+    messages,
+    supplyChainId: twinId || undefined,
+    userId: userData?.id || undefined,
   });
 
-  // Generate suggestions immediately when entering immersive mode
-  useEffect(() => {
-    if (isImmersiveMode) {
-      const timer = setTimeout(() => {
-        console.log('🚀 Generating suggestions for immersive mode');
-        debouncedContextualSuggestions();
-      }, 300);
-      return () => clearTimeout(timer);
-    }
-  }, [isImmersiveMode, debouncedContextualSuggestions]);
+  // Removed auto-generation of suggestions in immersive mode to save API quota.
 
     // Handle pending AI messages from validation dialog
   useEffect(() => {

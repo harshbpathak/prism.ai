@@ -55,6 +55,22 @@ export default function AddressAutocompleteMap({
     const inputRef = useRef<HTMLInputElement>(null)
     const suggestionsRef = useRef<HTMLUListElement>(null)
     const selectedItemRef = useRef<HTMLLIElement>(null)
+    const latestQueryRef = useRef(query)
+
+    // Keep track of the latest query for the drag event handler
+    useEffect(() => {
+        latestQueryRef.current = query
+    }, [query])
+
+    // Extract onDrag to be reusable and not depend on state directly
+    const handleMarkerDragEnd = useCallback((e: L.DragEndEvent) => {
+        const marker = e.target as L.Marker;
+        const lngLat = marker.getLatLng();
+        console.log('Marker dragged to:', lngLat);
+        setLatitude(lngLat.lat.toFixed(6));
+        setLongitude(lngLat.lng.toFixed(6));
+        onCoordinatesChange(lngLat.lat.toFixed(6), lngLat.lng.toFixed(6), latestQueryRef.current);
+    }, [onCoordinatesChange]);
 
     useEffect(() => {
         const mapContainer = document.getElementById('map')
@@ -68,6 +84,21 @@ export default function AddressAutocompleteMap({
 
         mapRef.current = myMap
 
+        // If we already have coordinates, add a marker
+        if (latitude && longitude && !isNaN(parseFloat(latitude)) && !isNaN(parseFloat(longitude))) {
+            const lat = parseFloat(latitude)
+            const lng = parseFloat(longitude)
+            myMap.setView([lat, lng], 15)
+
+            const marker = L.marker([lat, lng], { draggable: true })
+                .bindPopup(`<div>${latestQueryRef.current || 'Selected Location'}</div>`)
+                .addTo(myMap)
+            
+            markerRef.current = marker
+
+            marker.on('dragend', handleMarkerDragEnd)
+        }
+
         return () => {
             if (myMap) {
                 myMap.remove()
@@ -77,7 +108,7 @@ export default function AddressAutocompleteMap({
                 }, 100);
             }
         }
-    }, [latitude, longitude]) // Add latitude/longitude dependency to re-initialize when it becomes visible if needed
+    }, [latitude, longitude, handleMarkerDragEnd]) // Add latitude/longitude dependency to re-initialize when it becomes visible if needed
 
     // Click outside handler to close suggestions
     useEffect(() => {
@@ -284,17 +315,7 @@ export default function AddressAutocompleteMap({
             onCoordinatesChange(location.lat.toFixed(6), location.lng.toFixed(6), address)
 
             // Add drag event listener
-            marker.on('dragend', onDrag)
-        }
-    }
-
-    const onDrag = () => {
-        if (markerRef.current) {
-            const lngLat = markerRef.current.getLatLng()
-            console.log('Marker dragged to:', lngLat)
-            setLatitude(lngLat.lat.toFixed(6))
-            setLongitude(lngLat.lng.toFixed(6))
-            onCoordinatesChange(lngLat.lat.toFixed(6), lngLat.lng.toFixed(6), query)
+            marker.on('dragend', handleMarkerDragEnd)
         }
     }
 

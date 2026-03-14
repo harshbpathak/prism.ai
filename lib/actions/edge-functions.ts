@@ -69,7 +69,112 @@ export async function getUserSupplyChainsAction(userId: string) {
 }
 
 export async function saveSupplyChainAction(supplyChainData: any) {
-  return invokeEdgeFunction('bright-processor', supplyChainData);
+  try {
+    const {
+      id: supplyChainId,
+      name,
+      description,
+      nodes,
+      edges,
+      organisation,
+      formData,
+      timestamp
+    } = supplyChainData;
+
+    // 1. Upsert the supply chain record
+    const { data: scData, error: scError } = await supabaseServer
+      .from('supply_chains')
+      .upsert({
+        supply_chain_id: supplyChainId,
+        name,
+        description,
+        user_id: organisation?.id,
+        organisation,
+        form_data: formData,
+        timestamp: timestamp || new Date().toISOString()
+      })
+      .select()
+      .single();
+
+    if (scError) {
+      console.error('Error upserting supply chain:', scError);
+      return { data: null, error: scError.message };
+    }
+
+    const sid = scData.supply_chain_id;
+
+    // 2. Clean up existing nodes and edges for this supply chain to ensure consistency
+    // (Deletion cascade might handle this if configured, but explicit is safer)
+    await Promise.all([
+      supabaseServer.from('nodes').delete().eq('supply_chain_id', sid),
+      supabaseServer.from('edges').delete().eq('supply_chain_id', sid)
+    ]);
+
+    // 3. Insert new nodes
+    if (nodes && nodes.length > 0) {
+      const nodesToInsert = nodes.map((node: any) => ({
+        node_id: node.id,
+        supply_chain_id: sid,
+        name: node.data?.label || node.id,
+        type: node.data?.type || node.type,
+        description: node.data?.description || '',
+        data: node.data,
+        location_lat: node.data?.position?.y || node.position?.y, // Mapping relative canvas y to lat for now if needed
+        location_lng: node.data?.position?.x || node.position?.x,
+        address: node.data?.address,
+        capacity: node.data?.capacity || 0,
+        risk_level: node.data?.riskScore || 0,
+        width: node.width || 150,
+        height: node.height || 40,
+        selected: node.selected || false,
+        dragging: node.dragging || false
+      }));
+
+      const { error: nodesError } = await supabaseServer
+        .from('nodes')
+        .insert(nodesToInsert);
+
+      if (nodesError) {
+        console.error('Error inserting nodes:', nodesError);
+        return { data: null, error: nodesError.message };
+      }
+    }
+
+    // 4. Insert new edges
+    if (edges && edges.length > 0) {
+      const edgesToInsert = edges.map((edge: any) => ({
+        edge_id: edge.id,
+        supply_chain_id: sid,
+        from_node_id: edge.source,
+        to_node_id: edge.target,
+        type: edge.type || 'default',
+        data: edge.data,
+        selected: edge.selected || false
+      }));
+
+      const { error: edgesError } = await supabaseServer
+        .from('edges')
+        .insert(edgesToInsert);
+
+      if (edgesError) {
+        console.error('Error inserting edges:', edgesError);
+        return { data: null, error: edgesError.message };
+      }
+    }
+
+    return { 
+      data: { 
+        status: 'success', 
+        supply_chain_id: sid,
+        nodes_count: nodes?.length || 0,
+        edges_count: edges?.length || 0
+      }, 
+      error: null 
+    };
+  } catch (err: any) {
+    console.error("Critical error in saveSupplyChainAction:", err);
+    return { data: null, error: err.message };
+  }
 }
 
 export async function deleteSupplyChainAction(supplyChainId: string, organisationId: string) {

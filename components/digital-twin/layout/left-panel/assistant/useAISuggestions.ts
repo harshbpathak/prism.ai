@@ -4,18 +4,26 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import { Node, Edge } from 'reactflow';
 import { toast } from "sonner";
 import { AISuggestion, AutocompleteSuggestion } from './types';
+import { supabaseClient } from '@/lib/supabase/client';
 
-// Simple memory cache to prevent redundant API calls
+// Simple memory cache to prevent redundant API calls within the same session
 const suggestionsCache = new Map<string, any>();
-const CACHE_TTL = 1000 * 60 * 5; // 5 minutes
+const CACHE_TTL = 1000 * 60 * 10; // 10 minutes — increased from 5 minutes
+
+// Session flag: only auto-fetch once per component mount cycle per supply chain
+// (re-fetches after POLL_INTERVAL if user stays on page)
+const POLL_INTERVAL_SUGGESTIONS = 1000 * 60; // 60 seconds — very slow polling
+const POLL_INTERVAL_AUTOCOMPLETE = 1000 * 45; // 45 seconds
 
 interface UseAISuggestionsProps {
   nodes: Node[];
   edges: Edge[];
   messages: any[];
+  supplyChainId?: string; // Used for Supabase persistence
+  userId?: string;
 }
 
-export const useAISuggestions = ({ nodes, edges, messages }: UseAISuggestionsProps) => {
+export const useAISuggestions = ({ nodes, edges, messages, supplyChainId, userId }: UseAISuggestionsProps) => {
   // AI Suggestions state
   const [suggestions, setSuggestions] = useState<AISuggestion[]>([]);
   const [isSuggestionsLoading, setIsSuggestionsLoading] = useState(false);
@@ -27,69 +35,65 @@ export const useAISuggestions = ({ nodes, edges, messages }: UseAISuggestionsPro
   
   const suggestionTimeout = useRef<NodeJS.Timeout | null>(null);
   const autocompleteTimeout = useRef<NodeJS.Timeout | null>(null);
+  const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const autocompletePollRef = useRef<NodeJS.Timeout | null>(null);
+  const realtimeChannelRef = useRef<any>(null);
 
   // Generate contextual AI suggestions based on supply chain state
   const generateContextualSuggestions = useCallback(async () => {
     if (nodes.length === 0) return;
 
+    // Check cache first
+    const cacheKey = `suggestions_${nodes.length}_${edges.length}`;
+    const cached = suggestionsCache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+      console.log('✅ AI Suggestions: Using cached suggestions');
+      setSuggestions(cached.data);
+      setShowSuggestions(true);
+      return;
+    }
+
     setIsSuggestionsLoading(true);
     try {
-      // Use the same rich context as CopilotKit and autocomplete
-      const fullNodesContext = {
-        nodes: nodes.map(node => ({
-          id: node.id,
-          type: node.type,
-          label: node.data?.label || 'Untitled',
-          position: node.position,
-          data: {
-            description: node.data?.description,
-            capacity: node.data?.capacity,
-            leadTime: node.data?.leadTime,
-            riskScore: node.data?.riskScore,
-            location: node.data?.location,
-            address: node.data?.address
-          }
-        })),
-        totalNodes: nodes.length,
-        nodeTypes: [...new Set(nodes.map(n => n.type))],
-        hasConnections: edges.length > 0,
-        hasRisks: nodes.some(n => n.data?.riskScore > 0.5),
-        avgRiskScore: nodes.length > 0 ? 
-          nodes.reduce((sum, n) => sum + (n.data?.riskScore || 0), 0) / nodes.length : 0
-      };
-
-      const fullEdgesContext = {
-        connections: edges.map(edge => ({
-          id: edge.id,
-          source: edge.source,
-          target: edge.target,
-          mode: edge.data?.mode || 'road',
-          cost: edge.data?.cost || 0,
-          transitTime: edge.data?.transitTime || 0,
-          riskMultiplier: edge.data?.riskMultiplier || 1
-        })),
-        totalConnections: edges.length
-      };
-
       const fullContext = {
-        supply_chain: fullNodesContext,
-        connections: fullEdgesContext
+        supply_chain: {
+          nodes: nodes.map(node => ({
+            id: node.id,
+            type: node.type,
+            label: node.data?.label || 'Untitled',
+            data: {
+              description: node.data?.description,
+              capacity: node.data?.capacity,
+              leadTime: node.data?.leadTime,
+              riskScore: node.data?.riskScore,
+              location: node.data?.location,
+              address: node.data?.address
+            }
+          })),
+          totalNodes: nodes.length,
+          nodeTypes: [...new Set(nodes.map(n => n.type))],
+          hasConnections: edges.length > 0,
+          hasRisks: nodes.some(n => n.data?.riskScore > 0.5),
+          avgRiskScore: nodes.length > 0 ?
+            nodes.reduce((sum, n) => sum + (n.data?.riskScore || 0), 0) / nodes.length : 0
+        },
+        connections: {
+          connections: edges.map(edge => ({
+            id: edge.id,
+            source: edge.source,
+            target: edge.target,
+            mode: edge.data?.mode || 'road',
+            cost: edge.data?.cost || 0,
+            transitTime: edge.data?.transitTime || 0,
+            riskMultiplier: edge.data?.riskMultiplier || 1
+          })),
+          totalConnections: edges.length
+        }
       };
 
       const prompt = `Based on this detailed supply chain context: ${JSON.stringify(fullContext)}, 
         provide 3-5 actionable suggestions to improve efficiency, reduce risks, or optimize operations. Consider the specific nodes, their properties, connections, risk scores, and relationships.`;
 
-      // Check cache first using node and edge count as a simple key
-      const cacheKey = `suggestions_${nodes.length}_${edges.length}`;
-      const cached = suggestionsCache.get(cacheKey);
-      if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
-        console.log('✅ AI Chat Panel: Using cached suggestions');
-        setSuggestions(cached.data);
-        setShowSuggestions(true);
-        setIsSuggestionsLoading(false);
-        return;
-      }
-
       const response = await fetch('/api/suggestions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -102,103 +106,83 @@ export const useAISuggestions = ({ nodes, edges, messages }: UseAISuggestionsPro
         const data = await response.json();
         
         if (data.suggestions) {
-          console.log('✅ AI Chat Panel: Received suggestions:', data.suggestions);
+          console.log('✅ AI Suggestions: Received suggestions:', data.suggestions);
           setSuggestions(data.suggestions);
           setShowSuggestions(true);
           suggestionsCache.set(cacheKey, { data: data.suggestions, timestamp: Date.now() });
-        } else if (data.message) {
-          try {
-            let jsonText = data.message;
-            const markdownJsonMatch = data.message.match(/```json\s*([\s\S]*?)\s*```/);
-            if (markdownJsonMatch) {
-              jsonText = markdownJsonMatch[1];
+
+          // Persist to Supabase if we have the necessary IDs
+          if (supplyChainId && userId) {
+            try {
+              const client = supabaseClient;
+              if (client) {
+                await (client as any)
+                  .from('ai_suggestions')
+                  .upsert({
+                    supply_chain_id: supplyChainId,
+                    user_id: userId,
+                    suggestions: data.suggestions,
+                    expires_at: new Date(Date.now() + 1000 * 60 * 60 * 24).toISOString() // 24h TTL
+                  }, { onConflict: 'supply_chain_id,user_id' });
+              }
+            } catch (dbError) {
+              // Silently fail — persistence is a bonus, not required
+              console.warn('AI Suggestions: Could not persist to Supabase:', dbError);
             }
-            
-            const parsedData = JSON.parse(jsonText);
-            setSuggestions(parsedData.suggestions || []);
-            setShowSuggestions(true);
-            suggestionsCache.set(cacheKey, { data: parsedData.suggestions || [], timestamp: Date.now() });
-          } catch (parseError) {
-            console.error('Error parsing suggestions JSON:', parseError);
-            toast.error('Failed to parse AI suggestions');
           }
         }
-      } else {
-        const errorData = await response.json();
-        // console.error('API Error:', errorData);
       }
     } catch (error) {
       console.error('Error generating suggestions:', error);
-      toast.error('Failed to generate AI suggestions');
     } finally {
       setIsSuggestionsLoading(false);
     }
-  }, [nodes, edges]);
+  }, [nodes, edges, supplyChainId, userId]);
 
   // Generate context-based autocomplete suggestions
   const generateContextualAutocompleteSuggestions = useCallback(async () => {
+    // Check cache first
+    const numMessages = messages.length;
+    const cacheKey = `autocomplete_${nodes.length}_${edges.length}_${numMessages}`;
+    const cached = suggestionsCache.get(cacheKey);
+    
+    if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+      console.log('✅ AI Suggestions: Using cached autocomplete');
+      setAutocompleteSuggestions(cached.data);
+      return;
+    }
+
     setIsAutocompleteLoading(true);
     try {
-      const fullNodesContext = {
-        nodes: nodes.map(node => ({
-          id: node.id,
-          type: node.type,
-          label: node.data?.label || 'Untitled',
-          position: node.position,
-          data: {
-            description: node.data?.description,
-            capacity: node.data?.capacity,
-            leadTime: node.data?.leadTime,
-            riskScore: node.data?.riskScore,
-            location: node.data?.location,
-            address: node.data?.address
-          }
-        })),
-        totalNodes: nodes.length,
-        nodeTypes: [...new Set(nodes.map(n => n.type))],
-        hasConnections: edges.length > 0
-      };
-
-      const fullEdgesContext = {
-        connections: edges.map(edge => ({
-          id: edge.id,
-          source: edge.source,
-          target: edge.target,
-          mode: edge.data?.mode || 'road',
-          cost: edge.data?.cost || 0,
-          transitTime: edge.data?.transitTime || 0,
-          riskMultiplier: edge.data?.riskMultiplier || 1
-        })),
-        totalConnections: edges.length
-      };
-
-      // Include recent conversation context
-      const recentMessages = messages.slice(-5).map(msg => ({
-        role: msg.role,
-        content: msg.content ? msg.content.substring(0, 200) : ''
-      }));
-
       const fullContext = {
-        supply_chain: fullNodesContext,
-        connections: fullEdgesContext,
-        recent_conversation: recentMessages
+        supply_chain: {
+          nodes: nodes.map(node => ({
+            id: node.id,
+            type: node.type,
+            label: node.data?.label || 'Untitled',
+            data: {
+              description: node.data?.description,
+              capacity: node.data?.capacity,
+              leadTime: node.data?.leadTime,
+              riskScore: node.data?.riskScore,
+            }
+          })),
+          totalNodes: nodes.length,
+          nodeTypes: [...new Set(nodes.map(n => n.type))],
+          hasConnections: edges.length > 0
+        },
+        connections: {
+          totalConnections: edges.length
+        },
+        recent_conversation: messages.slice(-5).map(msg => ({
+          role: msg.role,
+          content: msg.content ? msg.content.substring(0, 200) : ''
+        }))
       };
 
       const prompt = `Based on the supply chain context and recent conversation: ${JSON.stringify(fullContext)}, 
         provide 4-6 intelligent query suggestions that would be most relevant for the user to ask next. Focus on actionable questions about optimization, analysis, and improvements.`;
 
-      // Check cache first using message length, node count, and edge count
-      const numMessages = messages.length;
-      const cacheKey = `autocomplete_${nodes.length}_${edges.length}_${numMessages}`;
-      const cached = suggestionsCache.get(cacheKey);
-      
-      if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
-        console.log('✅ AI Chat Panel: Using cached autocomplete suggestions');
-        setAutocompleteSuggestions(cached.data);
-        setIsAutocompleteLoading(false);
-        return;
-      }
-
       const response = await fetch('/api/suggestions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -211,7 +195,6 @@ export const useAISuggestions = ({ nodes, edges, messages }: UseAISuggestionsPro
         const data = await response.json();
         
         if (data.suggestions) {
-          console.log('✅ AI Chat Panel: Received contextual autocomplete suggestions:', data.suggestions);
           const autocompleteSugs = data.suggestions.map((suggestion: any, index: number) => ({
             id: suggestion.id || `contextual-${index}`,
             text: suggestion.title || suggestion.text || suggestion.action,
@@ -222,50 +205,7 @@ export const useAISuggestions = ({ nodes, edges, messages }: UseAISuggestionsPro
           }));
           setAutocompleteSuggestions(autocompleteSugs);
           suggestionsCache.set(cacheKey, { data: autocompleteSugs, timestamp: Date.now() });
-        } else if (data.message) {
-          try {
-            let jsonText = data.message;
-            const markdownJsonMatch = data.message.match(/```json\s*([\s\S]*?)\s*```/);
-            if (markdownJsonMatch) {
-              jsonText = markdownJsonMatch[1];
-            }
-            
-            const parsedData = JSON.parse(jsonText);
-            const transformedSuggestions = (parsedData.suggestions || []).map((suggestion: any, index: number) => ({
-              ...suggestion,
-              id: suggestion.id || `parsed-${index}`,
-              text: suggestion.title || suggestion.text || suggestion.action,
-              action: suggestion.action,
-              type: suggestion.type || 'suggestion' as const,
-            }));
-            setAutocompleteSuggestions(transformedSuggestions);
-            suggestionsCache.set(cacheKey, { data: transformedSuggestions, timestamp: Date.now() });
-          } catch (parseError) {
-            console.error('Error parsing contextual autocomplete JSON:', parseError);
-            const defaultSuggestions = [];
-            if (nodes.length > 0) {
-              defaultSuggestions.push({
-                id: 'default-1',
-                text: 'Analyze my supply chain risks',
-                description: 'Get insights on potential risks',
-                action: 'analyze my supply chain risks',
-                type: 'suggestion' as const,
-                confidence: 90
-              });
-              defaultSuggestions.push({
-                id: 'default-2',
-                text: 'Optimize transportation routes',
-                description: 'Find cost-effective routing options',
-                action: 'optimize transportation routes',
-                type: 'suggestion' as const,
-                confidence: 85
-              });
-            }
-            setAutocompleteSuggestions(defaultSuggestions);
-          }
         }
-      } else {
-        // console.error('Contextual autocomplete API error');  
       }
     } catch (error) {
       console.error('Error generating contextual autocomplete:', error);
@@ -274,53 +214,107 @@ export const useAISuggestions = ({ nodes, edges, messages }: UseAISuggestionsPro
     }
   }, [nodes, edges, messages]);
 
-  // Debounced AI suggestions generator
-  const debouncedGenerateSuggestions = useCallback(() => {
-    if (suggestionTimeout.current) {
-      clearTimeout(suggestionTimeout.current);
+  // ─── Slow auto-poll for suggestions (60s interval, only when nodes exist) ─────
+  useEffect(() => {
+    if (nodes.length === 0) return;
+
+    // Trigger first fetch after a 20-second initial delay (not immediately)
+    const initialDelay = setTimeout(() => {
+      generateContextualSuggestions();
+    }, 20000);
+
+    // Then repeat every 60 seconds
+    pollIntervalRef.current = setInterval(() => {
+      generateContextualSuggestions();
+    }, POLL_INTERVAL_SUGGESTIONS);
+
+    return () => {
+      clearTimeout(initialDelay);
+      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+    };
+    // Only re-run when nodes/edges count changes (not on every render)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nodes.length, edges.length]);
+
+  // ─── Slow auto-poll for autocomplete suggestions (45s interval) ────────────
+  useEffect(() => {
+    if (nodes.length === 0) return;
+
+    // Trigger first fetch after 30 seconds (staggered from insights)
+    const initialDelay = setTimeout(() => {
+      generateContextualAutocompleteSuggestions();
+    }, 30000);
+
+    autocompletePollRef.current = setInterval(() => {
+      generateContextualAutocompleteSuggestions();
+    }, POLL_INTERVAL_AUTOCOMPLETE);
+
+    return () => {
+      clearTimeout(initialDelay);
+      if (autocompletePollRef.current) clearInterval(autocompletePollRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nodes.length, edges.length, messages.length]);
+
+  // ─── Supabase Realtime subscription for live suggestion updates ────────────
+  useEffect(() => {
+    if (!supplyChainId || !userId) return;
+
+    let channel: any;
+    try {
+      const client = supabaseClient as any;
+      if (!client?.channel) return;
+
+      channel = client
+        .channel(`ai_suggestions:${supplyChainId}`)
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'ai_suggestions',
+            filter: `supply_chain_id=eq.${supplyChainId}`
+          },
+          (payload: any) => {
+            console.log('📡 Realtime: Received new AI suggestions from Supabase', payload);
+            const newSuggestions = payload.new?.suggestions;
+            if (Array.isArray(newSuggestions) && newSuggestions.length > 0) {
+              setSuggestions(newSuggestions);
+              setShowSuggestions(true);
+            }
+          }
+        )
+        .subscribe();
+
+      realtimeChannelRef.current = channel;
+    } catch (err) {
+      console.warn('AI Suggestions: Realtime subscription failed (table may not exist yet):', err);
     }
-    suggestionTimeout.current = setTimeout(() => {
-      if (nodes.length > 0) {
-        console.log('🔄 AI Suggestions: Triggering generation for', nodes.length, 'nodes');
-        generateContextualSuggestions();
+
+    return () => {
+      if (realtimeChannelRef.current) {
+        try {
+          (supabaseClient as any)?.removeChannel(realtimeChannelRef.current);
+        } catch (_) { /* ignore cleanup errors */ }
+        realtimeChannelRef.current = null;
       }
-    }, 15000); // Increased debounce to 15 seconds to save API quota
+    };
+  }, [supplyChainId, userId]);
+
+  // Debounced suggestion generators (kept for manual triggers)
+  const debouncedGenerateSuggestions = useCallback(() => {
+    if (suggestionTimeout.current) clearTimeout(suggestionTimeout.current);
+    suggestionTimeout.current = setTimeout(() => {
+      if (nodes.length > 0) generateContextualSuggestions();
+    }, 15000);
   }, [nodes, edges, generateContextualSuggestions]);
 
-  // Debounced autocomplete suggestions generator
   const debouncedContextualSuggestions = useCallback(() => {
-    if (autocompleteTimeout.current) {
-      clearTimeout(autocompleteTimeout.current);
-    }
+    if (autocompleteTimeout.current) clearTimeout(autocompleteTimeout.current);
     autocompleteTimeout.current = setTimeout(() => {
-      console.log('🔄 Auto-generating debounced contextual autocomplete suggestions');
       generateContextualAutocompleteSuggestions();
-    }, 10000); // Increased debounce to 10 seconds to save API quota
+    }, 10000);
   }, [generateContextualAutocompleteSuggestions]);
-
-  // Auto-generate contextual suggestions when canvas changes (debounced)
-  useEffect(() => {
-    debouncedGenerateSuggestions();
-    
-    // Cleanup function to clear timeout if component unmounts
-    return () => {
-      if (suggestionTimeout.current) {
-        clearTimeout(suggestionTimeout.current);
-      }
-    };
-  }, [nodes, edges, debouncedGenerateSuggestions]);
-
-  // Auto-generate contextual autocomplete suggestions when context changes (debounced)
-  useEffect(() => {
-    debouncedContextualSuggestions();
-    
-    // Cleanup function to clear timeout if component unmounts
-    return () => {
-      if (autocompleteTimeout.current) {
-        clearTimeout(autocompleteTimeout.current);
-      }
-    };
-  }, [nodes, edges, messages, debouncedContextualSuggestions]);
 
   return {
     suggestions,
@@ -334,4 +328,4 @@ export const useAISuggestions = ({ nodes, edges, messages }: UseAISuggestionsPro
     generateContextualSuggestions,
     debouncedContextualSuggestions
   };
-}; 
+};

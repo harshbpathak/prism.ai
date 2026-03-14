@@ -16,8 +16,9 @@ const nodeTypeColors = {
   factory: 'bg-purple-100 border-purple-500 text-purple-800',
   port: 'bg-cyan-100 border-cyan-500 text-cyan-800',
   warehouse: 'bg-amber-100 border-amber-500 text-amber-800',
-  distribution: 'bg-emerald-100 border-emerald-800 text-emerald-800',
-  retailer: 'bg-red-100 border-red-500 text-red-800'
+  distribution: 'bg-emerald-100 border-emerald-500 text-emerald-800',
+  retailer: 'bg-red-100 border-red-500 text-red-800',
+  manufacturer: 'bg-orange-100 border-orange-500 text-orange-800'
 };
 
 // Helper to generate risk class
@@ -231,6 +232,37 @@ export const RetailerNode = memo(({ data, isConnectable, selected }: NodeProps) 
   );
 });
 
+// Manufacturer / Production Node
+export const ManufacturerNode = memo(({ data, isConnectable, selected }: NodeProps) => {
+  const riskClass = getRiskClass(data.riskScore);
+  const typeClass = data.nodeColor ? '' : nodeTypeColors.manufacturer;
+  const selectionClass = getSelectionClass(selected);
+  const nodeStyle = getNodeStyle(data, 'manufacturer');
+  
+  return (
+    <div 
+      style={nodeStyle} 
+      className={`${data.nodeColor ? 'border-0' : typeClass} ${riskClass} ${selectionClass}`}
+    >
+      <Handle
+        type="target"
+        position={Position.Left}
+        isConnectable={isConnectable}
+      />
+      <Handle
+        type="source"
+        position={Position.Right}
+        isConnectable={isConnectable}
+      />
+      
+      <div className="font-bold text-sm text-center">{data.label}</div>
+      {data.label?.toLowerCase().includes('india') && (
+        <div className="text-xs text-center mt-1">🇮🇳</div>
+      )}
+    </div>
+  );
+});
+
 // Template Group Node
 export const TemplateGroupNode = memo(({ data, selected }: NodeProps) => {
   // Use a simpler selection class for template groups without the blue ring
@@ -250,7 +282,6 @@ export const TemplateGroupNode = memo(({ data, selected }: NodeProps) => {
   );
 });
 
-// Export node types for use in React Flow
 export const nodeTypes = {
   supplierNode: SupplierNode,
   factoryNode: FactoryNode,
@@ -259,5 +290,7 @@ export const nodeTypes = {
   distributionNode: DistributionNode,
   retailerNode: RetailerNode,
   customerNode: RetailerNode,  // AI sometimes generates "customerNode" — alias to retailer
+  manufacturerNode: ManufacturerNode,
+  productionNode: ManufacturerNode, // Alias for production nodes
   group: TemplateGroupNode,
 }; 
