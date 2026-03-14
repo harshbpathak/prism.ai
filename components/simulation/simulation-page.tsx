@@ -17,28 +17,27 @@ import { useUser } from "@/lib/stores/user"
 import { useImpact } from "@/lib/context/impact-context"
 
 // Import separated components
-import { SimulationHeader } from "./simulation-header"
 import { FloatingRunButton } from "./floating-run-button"
 import { ProfessionalTemplateSelection } from "./professional-template-selection"
 import type { ApiResponse, SupplyChainData } from "./types"
 import { ScenarioConfigurationForm } from "./enhanced-scenario-configuration-form"
 
-// Glassmorphic Card Component with enhanced styling
-function GlassmorphicCard({ children, className = "", variant = "default", ...props }: { 
+// Minimalist Card Component with variant styling
+function MinimalCard({ children, className = "", variant = "default", ...props }: { 
   children: React.ReactNode; 
   className?: string; 
   variant?: "default" | "accent" | "subtle";
   [key: string]: any 
 }) {
   const variantStyles = {
-    default: "border border-white/30 dark:border-slate-700/20 bg-white/80 dark:bg-slate-900/20 backdrop-blur-xl shadow-xl shadow-black/5 dark:shadow-black/30",
-    accent: "border border-blue-200/50 dark:border-blue-800/30 bg-gradient-to-br from-white/90 to-blue-50/80 dark:from-slate-900/30 dark:to-blue-950/20 backdrop-blur-xl shadow-xl shadow-blue-500/10 dark:shadow-blue-500/20",
-    subtle: "border border-white/20 dark:border-slate-700/10 bg-white/60 dark:bg-slate-900/10 backdrop-blur-lg shadow-lg shadow-black/5 dark:shadow-black/20"
+    default: "border border-gray-200 dark:border-gray-800 bg-white dark:bg-black shadow-sm",
+    accent: "border border-black dark:border-white bg-gray-50 dark:bg-gray-900 shadow-md",
+    subtle: "border border-gray-100 dark:border-gray-900 bg-gray-50/50 dark:bg-gray-900/50 shadow-sm"
   }
   
   return (
     <Card 
-      className={`${variantStyles[variant]} rounded-2xl transition-all duration-300 hover:shadow-2xl hover:shadow-black/10 dark:hover:shadow-black/40 ${className}`} 
+      className={`${variantStyles[variant]} rounded-2xl transition-all duration-300 ${className}`} 
       {...props}
     >
       {children}
@@ -75,7 +74,7 @@ function SimulationPageContent() {
   const { setImpactData, setIsLoading } = useImpact()
 
   //fetch user 
-  const { userData } = useUser()
+  const { userData, userLoading } = useUser()
 
   const user_id = userData?.id
 
@@ -109,7 +108,10 @@ function SimulationPageContent() {
   useEffect(() => {
     const fetchSupplyChains = async () => {
       if (!userData?.id) {
-        toast.error("User not found. Please log in.")
+        // Only show error after loading is complete
+        if (!userLoading) {
+          toast.error("User not found. Please log in.")
+        }
         return
       }
 
@@ -139,13 +141,16 @@ function SimulationPageContent() {
       }
     }
     
+    // Wait for user store to finish loading before doing anything
+    if (userLoading) return
+
     if (!supplyChains.length && userData?.id) {
       fetchSupplyChains()
     } else if (supplyChains.length > 0 && !selectedSupplyChainId) {
       setSelectedSupplyChainId(supplyChains[0].supply_chain_id)
       fetchSimulationHistory(supplyChains[0].supply_chain_id)
     }
-  }, [supplyChains, userData, selectedSupplyChainId])
+  }, [supplyChains, userData, selectedSupplyChainId, userLoading])
 
   const fetchSimulationHistory = async (id: string) => {
     try {
@@ -432,97 +437,114 @@ function SimulationPageContent() {
   }, [simulationComplete, pendingNavigation, selectedSupplyChainId, router])
 
   return (
-    <div className="relative min-h-full flex-1 bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-100/60 dark:from-gray-900 dark:via-slate-900 dark:to-indigo-950 overflow-x-hidden">
-      {/* Enhanced animated background elements */}
-      <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute top-1/4 left-1/4 w-80 h-80 rounded-full bg-gradient-to-br from-purple-400/30 to-pink-400/20 dark:from-purple-900/40 dark:to-pink-900/30 blur-3xl animate-pulse"></div>
-        <div className="absolute bottom-1/3 right-1/3 w-96 h-96 rounded-full bg-gradient-to-br from-blue-400/25 to-cyan-400/15 dark:from-blue-900/40 dark:to-cyan-900/30 blur-3xl animate-bounce [animation-duration:8s]"></div>
-        <div className="absolute top-1/2 right-1/4 w-64 h-64 rounded-full bg-gradient-to-br from-emerald-300/20 to-teal-400/10 dark:from-emerald-900/30 dark:to-teal-900/20 blur-2xl animate-pulse [animation-delay:2s]"></div>
-        <div className="absolute bottom-1/4 left-1/3 w-72 h-72 rounded-full bg-gradient-to-br from-orange-300/15 to-amber-400/10 dark:from-orange-900/25 dark:to-amber-900/20 blur-3xl animate-pulse [animation-delay:4s]"></div>
+    <div className="relative min-h-full flex-1 bg-white dark:bg-black overflow-hidden text-black dark:text-white">
+      <div className="flex h-full">
+        {/* Left Rail — Workflow Steps */}
+        <aside className="w-52 shrink-0 border-r border-slate-200 dark:border-slate-800 flex flex-col py-6 px-4 gap-1">
+          <p className="text-[10px] uppercase tracking-[0.18em] text-slate-400 font-semibold mb-3 px-2">Probe Workflow</p>
+          <StepItem active={view === 'templates'} done={view === 'form' || view === 'simulation'} number={1} label="Select Preset" onClick={() => view !== 'simulation' && setView('templates')} />
+          <StepItem active={view === 'form'} done={view === 'simulation'} number={2} label="Configure Parameters" onClick={() => {}} />
+          <StepItem active={view === 'simulation'} done={false} number={3} label="Execute Probe" onClick={() => {}} />
 
-        {/* Additional floating elements for depth */}
-        <div className="absolute top-10 right-10 w-32 h-32 rounded-full bg-gradient-to-br from-rose-300/20 to-pink-300/10 dark:from-rose-900/30 dark:to-pink-900/20 blur-xl animate-bounce [animation-duration:6s] [animation-delay:1s]"></div>
-        <div className="absolute bottom-10 left-10 w-40 h-40 rounded-full bg-gradient-to-br from-violet-300/15 to-purple-300/10 dark:from-violet-900/25 dark:to-purple-900/20 blur-xl animate-pulse [animation-delay:3s]"></div>
-      </div>
+          <div className="mt-auto border-t border-slate-200 dark:border-slate-800 pt-4 space-y-1">
+            <p className="text-[10px] uppercase tracking-[0.18em] text-slate-400 font-semibold mb-2 px-2">Tools</p>
+            <button
+              onClick={() => setIsAIScenarioOpen(true)}
+              className="w-full flex items-center gap-2 px-2 py-1.5 text-xs text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-900 rounded transition-colors text-left"
+            >
+              <span className="w-4 h-4 text-slate-400">✦</span>
+              AI Vector Generator
+            </button>
+          </div>
+        </aside>
 
-      <div className="relative flex flex-col h-full z-10">
-        <SimulationHeader />
-
-        <div className="flex-1 overflow-y-auto">
-          {view === "templates" && (
-            <div className="relative flex flex-col gap-6 p-6 md:gap-8 md:p-8 max-w-full">
-              <div className="max-w-7xl mx-auto">
-                <div>
-                  <h1 className="text-4xl text-center font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-400 dark:to-indigo-400">
-                    Supply Chain Risk Simulation
-                  </h1>
-                  <p className="text-slate-600 text-center pb-10 dark:text-slate-300">
-                    Choose from AI-powered scenarios, professional templates, or
-                    create custom simulations to test your supply chain
-                    resilience
-                  </p>
-                </div>
-
-                <ProfessionalTemplateSelection
-                  onTemplateSelect={handleTemplateSelect}
-                  onStartFromScratch={handleStartFromScratch}
-                  onAIScenarios={() => setIsAIScenarioOpen(true)}
-                  onSelectScenario={handleForecastScenarioSelect}
-                />
-              </div>
-            </div>
-          )}
-
-          {view === "form" && (
-            <div className="relative">
-              <div className="p-4 px-10 space-y-8">
-                {/* Enhanced Header Section */}
-                <div className="max-w-7xl mx-auto">
-                  <div className="border-b border-slate-200 dark:border-slate-800 pb-4 mb-4">
-                    <div className="flex items-center justify-between">
+        {/* Main Panel */}
+        <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+          <div className="flex-1 overflow-y-auto">
+            {view === "templates" && (
+              <div className="p-8">
+                <div className="max-w-5xl mx-auto">
+                  {/* New header: left-aligned, terse */}
+                  <div className="mb-8 pb-5 border-b border-slate-200 dark:border-slate-800">
+                    <div className="flex items-start justify-between">
                       <div>
-                        <h1 className="text-4xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-400 dark:to-indigo-400">
-                          Scenario Builder
+                        <p className="text-[10px] uppercase tracking-[0.18em] text-slate-400 font-semibold mb-1">Fault Injection Blueprint</p>
+                        <h1 className="text-2xl font-bold tracking-tight text-black dark:text-white">
+                          Select an Event Vector
                         </h1>
-                        <p className="text-slate-600 dark:text-slate-300 text-sm mt-1">
-                          Build and configure supply chain disruption scenarios
+                        <p className="text-sm text-slate-500 mt-1 max-w-lg">
+                          Choose from pre-calibrated disruption presets, or define a custom fault scenario for your network graph.
                         </p>
                       </div>
-                      <Button
-                        variant="outline"
-                        onClick={() => setView("templates")}
-                        className="text-sm self-start"
-                      >
-                        ← Back to Templates
-                      </Button>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <div className="px-2.5 py-1 border border-slate-200 dark:border-slate-800 text-[11px] text-slate-500 tracking-wide">
+                          STEP 1 / 3
+                        </div>
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                {/* Enhanced Form Configuration */}
-                <div className="max-w-7xl mx-auto">
+                  <ProfessionalTemplateSelection
+                    onTemplateSelect={handleTemplateSelect}
+                    onStartFromScratch={handleStartFromScratch}
+                    onAIScenarios={() => setIsAIScenarioOpen(true)}
+                    onSelectScenario={handleForecastScenarioSelect}
+                  />
+                </div>
+              </div>
+            )}
+
+            {view === "form" && (
+              <div className="p-8">
+                <div className="max-w-5xl mx-auto">
+                  {/* Form header */}
+                  <div className="mb-8 pb-5 border-b border-slate-200 dark:border-slate-800">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <p className="text-[10px] uppercase tracking-[0.18em] text-slate-400 font-semibold mb-1">Parameter Configuration</p>
+                        <h1 className="text-2xl font-bold tracking-tight text-black dark:text-white">
+                          Fault Vector Parameters
+                        </h1>
+                        <p className="text-sm text-slate-500 mt-1 max-w-lg">
+                          Define the scope and intensity of your probe — affected origin nodes, cascade probability, and fault depth.
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          onClick={() => setView("templates")}
+                          className="flex items-center gap-1.5 text-xs border border-slate-200 dark:border-slate-800 px-3 py-1.5 text-slate-500 hover:text-black dark:hover:text-white hover:border-slate-400 transition-colors"
+                        >
+                          ← Presets
+                        </button>
+                        <div className="px-2.5 py-1 border border-slate-200 dark:border-slate-800 text-[11px] text-slate-500 tracking-wide">
+                          STEP 2 / 3
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
                   <ScenarioConfigurationForm />
                 </div>
-              </div>
 
-              {/* Floating Action Button */}
-              <FloatingRunButton
-                isFormValid={isFormValid}
-                onRunSimulation={runSimulation}
-                scenarioData={scenarioData}
-              />
-            </div>
-          )}
-
-          {view === "simulation" && simulationRunning && (
-            <div className="p-6 px-10">
-              <div className="max-w-4xl mx-auto">
-                <GlassmorphicCard variant="accent" className="p-12">
-                  <SimulationLoader progress={progress} />
-                </GlassmorphicCard>
+                {/* Floating Action Button */}
+                <FloatingRunButton
+                  isFormValid={isFormValid}
+                  onRunSimulation={runSimulation}
+                  scenarioData={scenarioData}
+                />
               </div>
-            </div>
-          )}
+            )}
+
+            {view === "simulation" && simulationRunning && (
+              <div className="flex items-center justify-center min-h-[calc(100vh-4rem)]">
+                <div className="w-full max-w-2xl mx-auto p-8">
+                  <div className="border border-slate-200 dark:border-slate-800 p-10">
+                    <SimulationLoader progress={progress} />
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -534,6 +556,28 @@ function SimulationPageContent() {
       />
     </div>
   );
+}
+
+function StepItem({ active, done, number, label, onClick }: { active: boolean; done: boolean; number: number; label: string; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`flex items-center gap-3 px-2 py-2 rounded text-left transition-colors w-full ${
+        active ? 'bg-black text-white dark:bg-white dark:text-black' :
+        done ? 'text-slate-500 hover:text-black dark:hover:text-white' :
+        'text-slate-400 cursor-default'
+      }`}
+    >
+      <span className={`w-5 h-5 rounded-full border flex-shrink-0 flex items-center justify-center text-[10px] font-bold ${
+        active ? 'border-white dark:border-black bg-white/20 dark:bg-black/20 text-white dark:text-black' :
+        done ? 'border-slate-400 text-slate-500' :
+        'border-slate-300 dark:border-slate-700 text-slate-400'
+      }`}>
+        {done ? '✓' : number}
+      </span>
+      <span className="text-xs truncate">{label}</span>
+    </button>
+  )
 }
 
 // Wrap component with context provider
