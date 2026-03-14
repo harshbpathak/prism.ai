@@ -218,7 +218,7 @@ export async function POST(request: NextRequest) {
         'Monitoring and reporting dashboard activated',
         'Stakeholder communication plan initiated'
       ],
-      trackingUrl: finalizedStrategyIds.length > 0 ? `/strategy?strategyId=${finalizedStrategyIds[0]}` : `/strategy`,
+      trackingUrl: `/simulation?simulationId=${simulationId}`,
       estimatedCompletionDate: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString(), // 90 days from now
       assignedTeams: [
         'Crisis Response Team',
