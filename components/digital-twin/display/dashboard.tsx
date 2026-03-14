@@ -2,13 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import DigitalTwinCard from '@/components/digital-twin/display/digital-twin-card';
 import { useQueryState, parseAsString } from 'nuqs';
 import { getUserSupplyChains, deleteSupplyChainViaEdgeFunction } from '@/lib/api/supply-chain';
 import { useUser } from '@/lib/stores/user';
-import { Skeleton } from '@/components/ui/skeleton';
 import { AlertCircle, Trash2 } from 'lucide-react';
 import { RefreshCWIcon, PlusIcon } from '@/components/icons';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -41,17 +38,6 @@ interface ApiResponse {
   };
 }
 
-// Glassmorphic Card Component
-function GlassmorphicCard({ children, className = "", ...props }: { children: React.ReactNode; className?: string; [key: string]: any }) {
-  return (
-    <Card 
-      className={`border border-white/30 dark:border-slate-700/10 bg-white/70 dark:bg-slate-900/5 backdrop-blur-xl shadow-xl shadow-black/5 dark:shadow-black/20 rounded-xl ${className}`} 
-      {...props}
-    >
-      {children}
-    </Card>
-  )
-}
 
 export default function DigitalTwinDashboard() {
   const [supplyChains, setSupplyChains] = useState<SupplyChainData[]>([]);
@@ -183,40 +169,18 @@ export default function DigitalTwinDashboard() {
   // Show loading skeleton while user is loading or supply chains are loading
   if (userLoading || loading) {
     return (
-      <div className="relative min-h-full flex-1 flex flex-col bg-gradient-to-br from-indigo-100 via-purple-50 to-cyan-100 dark:from-gray-900 dark:to-slate-900 overflow-x-hidden">
-        {/* Enhanced background blurred elements for light mode */}
-        <div className="absolute top-1/4 left-1/4 w-64 h-64 rounded-full bg-gradient-to-br from-purple-400 to-pink-400 dark:bg-purple-900 opacity-30 blur-3xl animate-pulse"></div>
-        <div className="absolute bottom-1/3 right-1/3 w-96 h-96 rounded-full bg-gradient-to-br from-blue-400 to-cyan-400 dark:bg-blue-900 opacity-25 blur-3xl"></div>
-        <div className="absolute top-1/2 right-1/4 w-48 h-48 rounded-full bg-gradient-to-br from-emerald-300 to-teal-400 dark:bg-emerald-900 opacity-20 blur-2xl"></div>
-        <div className="absolute bottom-1/4 left-1/3 w-72 h-72 rounded-full bg-gradient-to-br from-orange-300 to-amber-400 dark:bg-orange-900 opacity-15 blur-3xl animate-pulse"></div>
-        
-        <div className="relative p-4 sm:p-6 lg:p-8">
-          <header className="flex items-center justify-between mb-8">
-            <div className="space-y-2">
-              <Skeleton className="h-9 w-64" />
-              <Skeleton className="h-4 w-96" />
-            </div>
-            <Skeleton className="h-10 w-32" />
-          </header>
-          <main>
-            <div className="mb-6">
-              <Skeleton className="h-4 w-48" />
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {Array.from({ length: 6 }).map((_, i) => (
-                <GlassmorphicCard key={i} className="space-y-4 p-6">
-                  <Skeleton className="h-6 w-3/4" />
-                  <Skeleton className="h-4 w-full" />
-                  <Skeleton className="h-4 w-2/3" />
-                  <div className="flex gap-2">
-                    <Skeleton className="h-6 w-16" />
-                    <Skeleton className="h-6 w-20" />
-                    <Skeleton className="h-6 w-14" />
-                  </div>
-                </GlassmorphicCard>
-              ))}
-            </div>
-          </main>
+      <div className="relative min-h-full flex-1 flex flex-col bg-white dark:bg-black overflow-x-hidden text-black dark:text-white">
+        <div className="border-b border-slate-200 dark:border-slate-800 px-6 py-4 flex items-center justify-between">
+          <div className="space-y-1">
+            <div className="h-4 w-40 bg-slate-100 dark:bg-slate-900 rounded animate-pulse" />
+            <div className="h-3 w-64 bg-slate-100 dark:bg-slate-900 rounded animate-pulse" />
+          </div>
+          <div className="h-8 w-28 bg-slate-100 dark:bg-slate-900 rounded animate-pulse" />
+        </div>
+        <div className="flex-1 p-6 space-y-3">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="h-12 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded animate-pulse" />
+          ))}
         </div>
       </div>
     );
@@ -224,125 +188,151 @@ export default function DigitalTwinDashboard() {
 
   if (error) {
     return (
-      <div className="relative min-h-full flex-1 flex flex-col bg-gradient-to-br from-indigo-100 via-purple-50 to-cyan-100 dark:from-gray-900 dark:to-slate-900 overflow-x-hidden">
-        {/* Enhanced background blurred elements for light mode */}
-        <div className="absolute top-1/4 left-1/4 w-64 h-64 rounded-full bg-gradient-to-br from-purple-400 to-pink-400 dark:bg-purple-900 opacity-30 blur-3xl animate-pulse"></div>
-        <div className="absolute bottom-1/3 right-1/3 w-96 h-96 rounded-full bg-gradient-to-br from-blue-400 to-cyan-400 dark:bg-blue-900 opacity-25 blur-3xl"></div>
-        <div className="absolute top-1/2 right-1/4 w-48 h-48 rounded-full bg-gradient-to-br from-emerald-300 to-teal-400 dark:bg-emerald-900 opacity-20 blur-2xl"></div>
-        <div className="absolute bottom-1/4 left-1/3 w-72 h-72 rounded-full bg-gradient-to-br from-orange-300 to-amber-400 dark:bg-orange-900 opacity-15 blur-3xl animate-pulse"></div>
-        
-        <div className="relative p-4 sm:p-6 lg:p-8">
-          <header className="flex items-center justify-between mb-8">
-            <div className="space-y-2">
-              <h1 className="text-4xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-400 dark:to-indigo-400">
-                My Digital Twins
-              </h1>
-              <p className="text-slate-600 dark:text-slate-300">
-                Manage and monitor your supply chain digital twins
-              </p>
-            </div>
-            <div className="flex gap-2">
-              <Button 
-                variant="outline" 
-                onClick={handleRefresh}
-                disabled={refreshing}
-                className="shadow-md border-white/30 dark:border-slate-700/10 bg-white/70 dark:bg-slate-900/5 backdrop-blur-xl hover:bg-white/80 dark:hover:bg-slate-900/10"
-              >
-                <RefreshCWIcon className={`mr-2 ${refreshing ? 'animate-spin' : ''}`} size={16} />
-                Retry
-              </Button>
-              <Button onClick={() => setView('create')} className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-xl hover:shadow-2xl transition-all duration-300">
-                <PlusIcon size={16} className="mr-2" />
-                Create New Twin
-              </Button>
-            </div>
-          </header>
-          <GlassmorphicCard className="p-6">
-            <Alert variant="destructive" className="border-red-200/30 bg-red-50/70 dark:bg-red-900/5 backdrop-blur-xl">
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          </GlassmorphicCard>
+      <div className="relative min-h-full flex-1 flex flex-col bg-white dark:bg-black text-black dark:text-white">
+        <div className="border-b border-slate-200 dark:border-slate-800 px-6 py-4 flex items-center justify-between">
+          <div>
+            <p className="text-[10px] uppercase tracking-[0.18em] text-slate-400 font-semibold">Network Registry</p>
+            <h1 className="text-base font-semibold text-black dark:text-white mt-0.5">Operation Network Graphs</h1>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={handleRefresh}
+              disabled={refreshing}
+              className="flex items-center gap-2 px-3 py-1.5 text-xs border border-slate-200 dark:border-slate-800 text-slate-500 hover:text-black transition-colors"
+            >
+              <RefreshCWIcon className={`${refreshing ? 'animate-spin' : ''}`} size={12} />
+              Retry
+            </button>
+            <button onClick={() => setView('create')} className="flex items-center gap-2 px-3 py-1.5 text-xs bg-black text-white dark:bg-white dark:text-black">
+              <PlusIcon size={12} />
+              New Graph
+            </button>
+          </div>
+        </div>
+        <div className="p-6">
+          <Alert variant="destructive" className="border-red-200 dark:border-red-900">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="relative min-h-screen bg-gradient-to-br from-indigo-100 via-purple-50 to-cyan-100 dark:from-gray-900 dark:to-slate-900 overflow-x-hidden">
-      {/* Enhanced background blurred elements for light mode */}
-      <div className="absolute top-1/4 left-1/4 w-64 h-64 rounded-full bg-gradient-to-br from-purple-400 to-pink-400 dark:bg-purple-900 opacity-30 blur-3xl animate-pulse"></div>
-      <div className="absolute bottom-1/3 right-1/3 w-96 h-96 rounded-full bg-gradient-to-br from-blue-400 to-cyan-400 dark:bg-blue-900 opacity-25 blur-3xl"></div>
-      <div className="absolute top-1/2 right-1/4 w-48 h-48 rounded-full bg-gradient-to-br from-emerald-300 to-teal-400 dark:bg-emerald-900 opacity-20 blur-2xl"></div>
-      <div className="absolute bottom-1/4 left-1/3 w-72 h-72 rounded-full bg-gradient-to-br from-orange-300 to-amber-400 dark:bg-orange-900 opacity-15 blur-3xl animate-pulse"></div>
-      
-      <div className="relative p-4 sm:p-6 lg:p-8">
-        <header className="flex items-center justify-between mb-8">
-          <div className="space-y-2">
-            <h1 className="text-4xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-400 dark:to-indigo-400">
-              My Digital Twins
-            </h1>
-            <p className="text-slate-600 dark:text-slate-300">
-              Manage and monitor your supply chain digital twins
-            </p>
-          </div>
-          <div className="flex gap-2">
-            <Button 
-              variant="outline" 
-              onClick={handleRefresh}
-              disabled={refreshing}
-              className="shadow-md border-white/30 dark:border-slate-700/10 bg-white/70 dark:bg-slate-900/5 backdrop-blur-xl hover:bg-white/80 dark:hover:bg-slate-900/10"
-            >
-              <RefreshCWIcon className={`mr-2 ${refreshing ? 'animate-spin' : ''}`} size={16} />
-              Refresh
-            </Button>
-            <Button onClick={() => setView('create')} className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-xl hover:shadow-2xl transition-all duration-300">
-              <PlusIcon size={16} className="mr-2" />
-              Create New Twin
-            </Button>
-          </div>
-        </header>
-        
-        <main>
-          {supplyChains.length === 0 ? (
-            <GlassmorphicCard className="text-center py-12">
-              <div className="mx-auto max-w-md">
-                <div className="mx-auto h-12 w-12 text-slate-600 dark:text-slate-400 mb-4">
-                  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
-                  </svg>
-                </div>
-                <h3 className="text-lg font-semibold mb-2 text-slate-800 dark:text-slate-200">No Digital Twins Found</h3>
-                <p className="text-slate-600 dark:text-slate-400 mb-6">
-                  Get started by creating your first supply chain digital twin
-                </p>
-                <Button onClick={() => setView('create')} className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-xl hover:shadow-2xl transition-all duration-300">
-                  <PlusIcon size={16} className="mr-2" />
-                  Create Your First Twin
-                </Button>
+    <div className="relative min-h-screen bg-white dark:bg-black overflow-x-hidden text-black dark:text-white flex flex-col">
+
+      {/* Top Action Bar */}
+      <div className="border-b border-slate-200 dark:border-slate-800 px-6 py-4 flex items-center justify-between shrink-0">
+        <div>
+          <p className="text-[10px] uppercase tracking-[0.18em] text-slate-400 font-semibold">Network Registry</p>
+          <h1 className="text-base font-semibold text-black dark:text-white mt-0.5">
+            Operation Network Graphs
+            {supplyChains.length > 0 && (
+              <span className="ml-2 text-[10px] font-normal text-slate-400 border border-slate-200 dark:border-slate-800 px-1.5 py-0.5">
+                {supplyChains.length} registered
+              </span>
+            )}
+          </h1>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className="flex items-center gap-2 px-3 py-1.5 text-xs border border-slate-200 dark:border-slate-800 text-slate-500 hover:text-black dark:hover:text-white hover:border-slate-400 transition-colors"
+          >
+            <RefreshCWIcon className={`${refreshing ? 'animate-spin' : ''}`} size={12} />
+            Sync
+          </button>
+          <button
+            onClick={() => setView('create')}
+            className="flex items-center gap-2 px-3 py-1.5 text-xs bg-black text-white dark:bg-white dark:text-black hover:bg-slate-800 dark:hover:bg-slate-200 transition-colors"
+          >
+            <PlusIcon size={12} />
+            Register Graph
+          </button>
+        </div>
+      </div>
+
+      {/* Content */}
+      <div className="flex-1 overflow-y-auto">
+        {supplyChains.length === 0 ? (
+          <div className="flex items-center justify-center min-h-[calc(100vh-6rem)]">
+            <div className="text-center max-w-sm p-10 border border-slate-200 dark:border-slate-800">
+              <div className="w-10 h-10 border border-slate-200 dark:border-slate-800 flex items-center justify-center mx-auto mb-4">
+                <svg className="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+                </svg>
               </div>
-            </GlassmorphicCard>
-          ) : (
-            <>
-              <div className="mb-6 flex items-center justify-between">
-                <div className="text-sm text-slate-600 dark:text-slate-400 font-medium">
-                  {supplyChains.length} supply chain{supplyChains.length !== 1 ? 's' : ''} found
-                </div>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {supplyChains.map((chain) => (
-                  <div key={chain.supply_chain_id} className="group relative">
-                    <GlassmorphicCard className="h-full transition-all duration-300 hover:shadow-2xl hover:scale-105 hover:bg-white/80 dark:hover:bg-slate-900/10">
-                      <DigitalTwinCard 
-                        twin={formatSupplyChainForCard(chain)} 
-                      />
-                    </GlassmorphicCard>
-                    
-                    {/* Delete Icon - appears on hover */}
+              <h3 className="text-base font-medium text-black dark:text-white mb-2">Registry Empty</h3>
+              <p className="text-xs text-slate-500 mb-6 leading-relaxed">
+                No operation network graphs have been registered. Create your first graph to begin resilience modeling.
+              </p>
+              <button
+                onClick={() => setView('create')}
+                className="inline-flex items-center gap-2 px-4 py-2 text-xs bg-black text-white dark:bg-white dark:text-black hover:bg-slate-800 transition-colors"
+              >
+                <PlusIcon size={12} />
+                Register First Graph
+              </button>
+            </div>
+          </div>
+        ) : (
+          <>
+            {/* Table Header */}
+            <div className="grid grid-cols-[2fr_1fr_1fr_1fr_auto] items-center border-b border-slate-200 dark:border-slate-800 px-6 py-2 text-[10px] uppercase tracking-wider text-slate-400 font-semibold gap-4">
+              <span>Graph Name</span>
+              <span>Industry</span>
+              <span>Exposure Profile</span>
+              <span>Registered</span>
+              <span></span>
+            </div>
+
+            {/* Table Rows */}
+            <div className="divide-y divide-slate-100 dark:divide-slate-900">
+              {supplyChains.map((chain) => {
+                const riskLevel = chain.form_data?.risks?.length > 2 ? 'High' :
+                                  chain.form_data?.risks?.length > 1 ? 'Medium' : 'Low';
+                const date = new Date(chain.timestamp).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+                const industry = chain.form_data?.industry || chain.organisation?.industry || 'General';
+
+                return (
+                  <div key={chain.supply_chain_id} className="group grid grid-cols-[2fr_1fr_1fr_1fr_auto] items-center px-6 py-3.5 gap-4 hover:bg-slate-50 dark:hover:bg-slate-900/50 transition-colors">
+                    <button
+                      className="flex items-start gap-3 text-left min-w-0"
+                      onClick={() => {
+                        setView(`view:${chain.supply_chain_id}`);
+                      }}
+                    >
+                      <div className="w-7 h-7 border border-slate-200 dark:border-slate-800 flex items-center justify-center shrink-0 text-[10px] font-bold text-slate-500 mt-0.5">
+                        {chain.name?.charAt(0)?.toUpperCase() || '?'}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-black dark:text-white truncate group-hover:underline underline-offset-2">
+                          {chain.name || 'Unnamed Network'}
+                        </p>
+                        <p className="text-[11px] text-slate-500 truncate mt-0.5">
+                          {chain.description || `${chain.nodes?.length || 0} nodes · ${chain.edges?.length || 0} connections`}
+                        </p>
+                      </div>
+                    </button>
+
+                    <span className="text-xs text-slate-600 dark:text-slate-400 truncate">{industry}</span>
+
+                    <span className={`text-[11px] font-medium ${
+                      riskLevel === 'High' ? 'text-red-600' :
+                      riskLevel === 'Medium' ? 'text-amber-600' :
+                      'text-green-600'
+                    }`}>
+                      ● {riskLevel}
+                    </span>
+
+                    <span className="text-xs text-slate-500">{date}</span>
+
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="absolute bottom-2 right-2 h-8 w-8 p-0 opacity-0 group-hover:opacity-70 hover:opacity-100 transition-all duration-200 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950 dark:hover:text-red-400 z-10"
+                      className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-950/20"
                       onClick={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
@@ -352,24 +342,24 @@ export default function DigitalTwinDashboard() {
                       <Trash2 className="h-3.5 w-3.5" />
                     </Button>
                   </div>
-                ))}
-              </div>
-            </>
-          )}
-        </main>
+                );
+              })}
+            </div>
+          </>
+        )}
       </div>
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <DialogContent className="sm:max-w-md border border-white/30 dark:border-slate-700/10 bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl shadow-xl">
+        <DialogContent className="sm:max-w-md border border-slate-200 dark:border-slate-800 bg-white dark:bg-black shadow-none rounded-none">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-red-600 dark:text-red-400">
-              <AlertCircle className="h-5 w-5" />
-              Delete Supply Chain
+            <DialogTitle className="flex items-center gap-2 text-black dark:text-white text-sm font-semibold">
+              <AlertCircle className="h-4 w-4" />
+              Deregister Network Graph
             </DialogTitle>
-            <DialogDescription className="text-slate-600 dark:text-slate-300">
-              Are you sure you want to delete <span className="font-semibold">"{supplyChainToDelete?.name}"</span>? 
-              This action cannot be undone and will permanently remove all associated data.
+            <DialogDescription className="text-slate-500 mt-2 text-xs">
+              Remove <span className="font-semibold text-black dark:text-white">"{supplyChainToDelete?.name}"</span> from the registry?
+              This permanently deletes all associated node and edge data.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="flex gap-2 mt-6">
@@ -377,7 +367,7 @@ export default function DigitalTwinDashboard() {
               variant="outline"
               onClick={cancelDelete}
               disabled={deleting}
-              className="flex-1 border-white/30 dark:border-slate-700/10 bg-white/70 dark:bg-slate-900/5 backdrop-blur-xl hover:bg-white/80 dark:hover:bg-slate-900/10"
+              className="flex-1 border-slate-200 dark:border-slate-800 rounded-none shadow-none text-xs"
             >
               Cancel
             </Button>
@@ -385,17 +375,17 @@ export default function DigitalTwinDashboard() {
               variant="destructive"
               onClick={confirmDelete}
               disabled={deleting}
-              className="flex-1 bg-red-600 hover:bg-red-700 shadow-md"
+              className="flex-1 bg-red-600 hover:bg-red-700 text-white shadow-none rounded-none text-xs"
             >
               {deleting ? (
                 <>
-                  <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white"></div>
-                  Deleting...
+                  <div className="mr-2 h-3 w-3 animate-spin rounded-full border-2 border-white/30 border-t-white"></div>
+                  Removing…
                 </>
               ) : (
                 <>
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  Delete
+                  <Trash2 className="mr-2 h-3 w-3" />
+                  Deregister
                 </>
               )}
             </Button>
@@ -404,4 +394,4 @@ export default function DigitalTwinDashboard() {
       </Dialog>
     </div>
   );
-} 
+}
