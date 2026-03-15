@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { Node, Edge, ReactFlowInstance } from 'reactflow';
 import { useQueryState } from 'nuqs';
 
@@ -38,9 +38,18 @@ export function useDigitalTwinManager({
     isHydrated,
   } = useDigitalTwinState(initialNodes, initialEdges);
 
-  const [selectedSupplyChain, setSelectedSupplyChain] = useState("default-chain");
+  const [twinIdParam] = useQueryState('twinId');
+  const [selectedSupplyChain, setSelectedSupplyChain] = useState(twinIdParam || "default-chain");
   const [supplyChainName, setSupplyChainName] = useState("Default Supply Chain");
   const [description, setDescription] = useState("");
+
+  // Keep selectedSupplyChain in sync with URL if it changes
+  useEffect(() => {
+    if (twinIdParam && twinIdParam !== selectedSupplyChain) {
+      setSelectedSupplyChain(twinIdParam);
+    }
+  }, [twinIdParam]);
+
   const [simulationMode, setSimulationMode] = useState(false);
   const [isLeftPanelCollapsed, setIsLeftPanelCollapsed] = useState(false);
   const reactFlowInstance = useRef<ReactFlowInstance | null>(null);

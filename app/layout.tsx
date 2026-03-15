@@ -38,7 +38,13 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       </head>
       <body className="min-h-screen flex flex-col">
         <ErrorBoundary>
-          <NuqsAdapter>
+          <NuqsAdapter
+            // Force all nuqs URL updates to use shallow routing (history.pushState) instead of
+            // router.push. This prevents full page re-renders and component unmounts when any
+            // URL param changes — critical to keep dialogs like SaveSupplyChainDialog alive.
+            // @ts-ignore – the 'shallow' prop is an undocumented escape hatch that may not show in types
+            shallow
+          >
             <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>
               <CopilotProvider> 
                 {children}

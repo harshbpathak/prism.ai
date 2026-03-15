@@ -25,11 +25,14 @@ export async function GET(request: NextRequest) {
       .limit(1); // Get the most recent forecast
 
     if (forecastError) {
-      console.error('❌ Database error:', forecastError);
-      return NextResponse.json(
-        { error: 'Failed to fetch forecast data' },
-        { status: 500 }
-      );
+      // The 'forecasts' table may not exist yet in this Supabase project.
+      // Return empty scenarios gracefully rather than a hard 500.
+      console.warn('⚠️ Forecast table error (table may not exist yet):', forecastError.message);
+      return NextResponse.json({
+        success: true,
+        scenarios: [],
+        message: 'Forecast scenarios not available yet'
+      });
     }
 
     if (!forecasts || forecasts.length === 0) {

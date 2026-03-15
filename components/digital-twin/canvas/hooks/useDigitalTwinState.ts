@@ -10,7 +10,9 @@ import { compressArchData, decompressArchData } from '@/lib/utils/url-compressio
 export function useDigitalTwinState(initialNodes: Node[] = [], initialEdges: Edge[] = []) {
   const [archParam, setArchParam] = useQueryState('arch', {
     defaultValue: '',
-    shallow: false,
+    // CRITICAL: must be shallow=true so URL updates don't trigger a full re-render
+    // (which would unmount dialogs like SaveSupplyChainDialog & IntelligenceAnalysisDialog)
+    shallow: true,
   });
 
   const [hydratedNodes, setHydratedNodes] = useState<Node[]>([]);
@@ -75,6 +77,14 @@ export function useDigitalTwinState(initialNodes: Node[] = [], initialEdges: Edg
         
         console.log('🗜️ Compressing canvas state for URL...');
         const compressedString = compressArchData(canvasData);
+
+        // Guard: skip URL write if the compressed param would exceed safe URL length
+        // to avoid nuqs 'Max safe URL length exceeded' which causes full page re-renders.
+        if (compressedString.length > 2000) {
+          console.warn('⚠️ Compressed canvas data too large for URL (' + compressedString.length + ' chars), skipping URL update');
+          return;
+        }
+
         setArchParam(compressedString, { scroll: false, shallow: true });
       } catch (error) {
         console.error('Failed to update URL with canvas state:', error);

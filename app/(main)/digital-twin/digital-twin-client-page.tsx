@@ -58,7 +58,10 @@ export default function DigitalTwinClientPage() {
   // Load twin data when twinId changes
   useEffect(() => {
     if (twinId) {
-      setIsLoading(true);
+      // Only set loading state if we don't already have some twin data (prevents unmounting canvass during save)
+      if (!activeTwinData) {
+        setIsLoading(true);
+      }
       
       // If there's an arch parameter, we'll let the canvas handle the state
       // Only load from localStorage if there's no arch parameter
@@ -164,7 +167,7 @@ export default function DigitalTwinClientPage() {
         // but let the canvas handle the actual node/edge state from the URL
         setActiveTwinData({ hasArchData: true });
       }
-      setIsLoading(false);
+      if (!activeTwinData) setIsLoading(false);
     } else {
       setActiveTwinData(null);
       setIsLoading(false);
@@ -197,8 +200,8 @@ export default function DigitalTwinClientPage() {
 
     console.log(`🎯 Selected template: ${templateInfo.templateName} - ${templateInfo.reason}`);
 
-    // Create dummy twin ID with current date
-    const twinId = `twin-${Date.now()}`;
+    // Create dummy twin ID with a strict UUID so Supabase doesn't reject it
+    const twinId = crypto.randomUUID();
     
     // Store the template data temporarily for the canvas to use
     const twinData = {

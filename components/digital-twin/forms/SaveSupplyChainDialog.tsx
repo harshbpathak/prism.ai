@@ -1,8 +1,6 @@
 'use client';
 
-import { FC, useState, useEffect, useCallback, useMemo } from 'react';
-import { useQueryState, parseAsString, parseAsBoolean } from 'nuqs';
-import debounce from 'lodash.debounce';
+import { FC, useState, useEffect, useMemo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { CopilotTextarea } from '@copilotkit/react-textarea';
@@ -36,16 +34,21 @@ const SaveSupplyChainDialog: FC<SaveSupplyChainDialogProps> = ({
   nodes,
   edges,
 }) => {
-  // URL state for name and description with debouncing
-  const [nameParam, setNameParam] = useQueryState('saveName', parseAsString);
-  const [descriptionParam, setDescriptionParam] = useQueryState('saveDescription', parseAsString);
-  const [useLiteModel, setUseLiteModel] = useQueryState('use_lite_model', parseAsBoolean.withDefault(false));
-  
-  // Local state for immediate UI updates
-  const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
+  // Pure local state — no nuqs URL sync to avoid full page re-renders killing the dialog
+  const [name, setName] = useState(initialName || 'Default Supply Chain');
+  const [description, setDescription] = useState(initialDescription || '');
   const [errors, setErrors] = useState<FormErrors>({});
   const [isLoading, setIsLoading] = useState(false);
+
+  // Reset form when dialog opens
+  useEffect(() => {
+    if (isOpen) {
+      setName(initialName || 'Default Supply Chain');
+      setDescription(initialDescription || '');
+      setErrors({});
+      setIsLoading(false);
+    }
+  }, [isOpen, initialName, initialDescription]);
 
   const supplyChainContext = useMemo(() => {
     const context = {
@@ -57,66 +60,13 @@ const SaveSupplyChainDialog: FC<SaveSupplyChainDialogProps> = ({
     return JSON.stringify(context, null, 2);
   }, [nodes, edges]);
 
-  const autosuggestionsConfig = useMemo(() => {
-    const config = {
-      textareaPurpose:
-        'Generate a detailed summary for a supply chain. ' +
-        'Use the following context to inform the description: ' +
-        supplyChainContext,
-      chatApiConfigs: {
-        suggestionsApiConfig: {},
-      },
-    };
-
-    if (useLiteModel) {
-      (config.chatApiConfigs.suggestionsApiConfig as any).endpoint = '/api/copilotkitlitemodel';
-    }
-
-    return config;
-  }, [supplyChainContext, useLiteModel]);
-
-  // Debounced URL parameter updates
-  const debouncedSetNameParam = useCallback(
-    debounce((value: string) => {
-      setNameParam(value);
-    }, 500),
-    [setNameParam]
-  );
-
-  const debouncedSetDescriptionParam = useCallback(
-    debounce((value: string) => {
-      setDescriptionParam(value);
-    }, 500),
-    [setDescriptionParam]
-  );
-
-  // Initialize values from URL params or props when dialog opens
-  useEffect(() => {
-    if (isOpen) {
-      const initialNameValue = nameParam ?? initialName ?? 'Default Supply Chain';
-      const initialDescValue = descriptionParam ?? initialDescription ?? '';
-      
-      setName(initialNameValue);
-      setDescription(initialDescValue);
-    }
-  }, [isOpen, nameParam, descriptionParam, initialName, initialDescription]);
-
-  // Update URL params when local values change
-  useEffect(() => {
-    if (isOpen && name !== (nameParam || initialName)) {
-      debouncedSetNameParam(name);
-    }
-  }, [name, nameParam, initialName, isOpen, debouncedSetNameParam]);
-
-  useEffect(() => {
-    if (isOpen && description !== (descriptionParam || initialDescription)) {
-      debouncedSetDescriptionParam(description);
-    }
-  }, [description, descriptionParam, initialDescription, isOpen, debouncedSetDescriptionParam]);
-
-  useEffect(() => {
-    setUseLiteModel(isOpen);
-  }, [isOpen, setUseLiteModel]);
+  const autosuggestionsConfig = useMemo(() => ({
+    textareaPurpose:
+      'Generate a detailed summary for a supply chain. ' +
+      'Use the following context to inform the description: ' +
+      supplyChainContext,
+    chatApiConfigs: { suggestionsApiConfig: {} },
+  }), [supplyChainContext]);
 
   // Validate form inputs
   const validateForm = (): boolean => {
@@ -147,6 +97,7 @@ const SaveSupplyChainDialog: FC<SaveSupplyChainDialogProps> = ({
     setIsLoading(true);
     try {
       await onSave(name.trim(), description.trim());
+      // Dialog close is handled by the parent after save completes
       handleClose();
     } catch (error) {
       toast.error('Failed to save supply chain. Please try again.');
@@ -157,12 +108,8 @@ const SaveSupplyChainDialog: FC<SaveSupplyChainDialogProps> = ({
 
   // Handle dialog close
   const handleClose = () => {
-    // Clear URL parameters when dialog closes successfully
-    setNameParam(null);
-    setDescriptionParam(null);
-    
-    setName(initialName);
-    setDescription(initialDescription);
+    setName(initialName || '');
+    setDescription(initialDescription || '');
     setErrors({});
     setIsLoading(false);
     onClose();
@@ -175,28 +122,28 @@ const SaveSupplyChainDialog: FC<SaveSupplyChainDialogProps> = ({
     }
   };
 
-  // Handle input changes with immediate local state update
+  // Handle input changes
   const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setName(e.target.value);
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-lg w-full mx-4 p-8 rounded-xl shadow-2xl bg-blue-50/80 dark:bg-slate-900/50 border-slate-200/80 dark:border-slate-700/60">
+      <DialogContent className="sm:max-w-md w-full mx-4 p-6 rounded-xl shadow-2xl bg-blue-50/80 dark:bg-slate-900/50 border-slate-200/80 dark:border-slate-700/60 top-20 translate-y-0">
         <DialogHeader className="space-y-2">
-          <DialogTitle className="text-2xl font-bold text-gray-900 dark:text-gray-50">
+          <DialogTitle className="text-xl font-bold text-gray-900 dark:text-gray-50">
             Save Supply Chain
           </DialogTitle>
-          <DialogDescription className="text-base text-gray-500 dark:text-gray-400">
+          <DialogDescription className="text-sm text-gray-500 dark:text-gray-400">
             Provide a name and description for your supply chain configuration. 
             This will help you identify and manage it later.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-5 py-6">
+        <div className="space-y-4 py-4">
           {/* Supply Chain Name Input */}
           <div className="space-y-2">
-            <label htmlFor="supply-chain-name" className="text-base font-medium text-gray-800 dark:text-gray-200">
+            <label htmlFor="supply-chain-name" className="text-sm font-medium text-gray-800 dark:text-gray-200">
               Supply Chain Name *
             </label>
             <Input
@@ -207,7 +154,7 @@ const SaveSupplyChainDialog: FC<SaveSupplyChainDialogProps> = ({
               onChange={handleNameChange}
               onKeyPress={handleKeyPress}
               className={cn(
-                'border border-gray-300 text-base p-4 rounded-lg bg-gray-50 dark:bg-gray-800 dark:border-gray-700',
+                'border border-gray-300 text-sm p-3.5 rounded-xl bg-gray-50 dark:bg-gray-800 dark:border-gray-700',
                 {
                   'border-red-500 focus-visible:ring-red-500': errors.name,
                 }
@@ -228,7 +175,7 @@ const SaveSupplyChainDialog: FC<SaveSupplyChainDialogProps> = ({
 
           {/* Supply Chain Description Textarea */}
           <div className="space-y-2">
-            <label htmlFor="supply-chain-description" className="text-base font-medium text-gray-800 dark:text-gray-200">
+            <label htmlFor="supply-chain-description" className="text-sm font-medium text-gray-800 dark:text-gray-200">
               Description
             </label>
             <CopilotTextarea
@@ -237,7 +184,7 @@ const SaveSupplyChainDialog: FC<SaveSupplyChainDialogProps> = ({
               value={description}
               onValueChange={setDescription}
               className={cn(
-                'border border-gray-300 h-[120px] resize-none text-base p-4 rounded-lg bg-gray-50 dark:bg-gray-800 dark:border-gray-700 scrollbar-hide',
+                'border border-gray-300 h-[100px] resize-none text-sm p-3.5 rounded-xl bg-gray-50 dark:bg-gray-800 dark:border-gray-700 scrollbar-hide',
                 {
                   'border-red-500 focus-visible:ring-red-500': errors.description,
                 }
@@ -264,7 +211,7 @@ const SaveSupplyChainDialog: FC<SaveSupplyChainDialogProps> = ({
             variant="outline"
             onClick={handleClose}
             disabled={isLoading}
-            className="w-full sm:w-auto order-2 sm:order-1 text-base py-3 px-5 rounded-lg"
+            className="w-full sm:w-auto order-2 sm:order-1 text-sm py-2 px-4 rounded-lg"
           >
             Cancel
           </Button>
@@ -272,7 +219,7 @@ const SaveSupplyChainDialog: FC<SaveSupplyChainDialogProps> = ({
             type="button"
             onClick={handleSave}
             disabled={isLoading || !name.trim()}
-            className="w-full sm:w-auto order-1 sm:order-2 bg-blue-600 hover:bg-blue-700 focus:ring-blue-500 text-base py-3 px-5 rounded-lg shadow-md"
+            className="w-full sm:w-auto order-1 sm:order-2 bg-blue-600 hover:bg-blue-700 focus:ring-blue-500 text-sm py-2 px-4 rounded-lg shadow-md"
           >
             <Save className="w-5 h-5 mr-2.5" />
             {isLoading ? 'Saving...' : 'Save Supply Chain'}
@@ -287,4 +234,4 @@ const SaveSupplyChainDialog: FC<SaveSupplyChainDialogProps> = ({
   );
 };
 
-export default SaveSupplyChainDialog; 
+export default SaveSupplyChainDialog;

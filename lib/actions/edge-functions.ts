@@ -89,9 +89,12 @@ export async function saveSupplyChainAction(supplyChainData: any) {
         name,
         description,
         user_id: organisation?.id,
-        organisation,
-        form_data: formData,
-        timestamp: timestamp || new Date().toISOString()
+        // Embed formData and timestamp inside organisation payload since columns might be missing
+        organisation: { 
+          ...organisation, 
+          _form_data_fallback: formData,
+          _timestamp_fallback: timestamp || new Date().toISOString()
+        }
       })
       .select()
       .single();
@@ -111,24 +114,23 @@ export async function saveSupplyChainAction(supplyChainData: any) {
     ]);
 
     // 3. Insert new nodes
+    const nodeIdMap = new Map<string, string>();
+
     if (nodes && nodes.length > 0) {
-      const nodesToInsert = nodes.map((node: any) => ({
-        node_id: node.id,
-        supply_chain_id: sid,
-        name: node.data?.label || node.id,
-        type: node.data?.type || node.type,
-        description: node.data?.description || '',
-        data: node.data,
-        location_lat: node.data?.position?.y || node.position?.y, // Mapping relative canvas y to lat for now if needed
-        location_lng: node.data?.position?.x || node.position?.x,
-        address: node.data?.address,
-        capacity: node.data?.capacity || 0,
-        risk_level: node.data?.riskScore || 0,
-        width: node.width || 150,
-        height: node.height || 40,
-        selected: node.selected || false,
-        dragging: node.dragging || false
-      }));
+      const nodesToInsert = nodes.map((node: any) => {
+        const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(node.id);
+        const backendId = isUUID ? node.id : crypto.randomUUID();
+        nodeIdMap.set(node.id, backendId);
+
+        return {
+          node_id: backendId,
+          supply_chain_id: sid,
+          name: node.data?.label || node.id,
+          type: node.data?.type || node.type,
+          description: node.data?.description || '',
+          data: { ...node.data, original_id: node.id }
+        };
+      });
 
       const { error: nodesError } = await supabaseServer
         .from('nodes')
@@ -142,15 +144,20 @@ export async function saveSupplyChainAction(supplyChainData: any) {
 
     // 4. Insert new edges
     if (edges && edges.length > 0) {
-      const edgesToInsert = edges.map((edge: any) => ({
-        edge_id: edge.id,
-        supply_chain_id: sid,
-        from_node_id: edge.source,
-        to_node_id: edge.target,
-        type: edge.type || 'default',
-        data: edge.data,
-        selected: edge.selected || false
-      }));
+      const edgesToInsert = edges.map((edge: any) => {
+        const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(edge.id);
+        const backendId = isUUID ? edge.id : (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString());
+
+        return {
+          edge_id: backendId,
+          supply_chain_id: sid,
+          from_node_id: nodeIdMap.get(edge.source) || edge.source,
+          to_node_id: nodeIdMap.get(edge.target) || edge.target,
+          type: edge.type || 'default',
+          data: edge.data,
+          selected: edge.selected || false
+        };
+      });
 
       const { error: edgesError } = await supabaseServer
         .from('edges')
@@ -178,10 +185,25 @@ export async function saveSupplyChainAction(supplyChainData: any) {
 }
 
 export async function deleteSupplyChainAction(supplyChainId: string, organisationId: string) {
-  return invokeEdgeFunction('quick-api', {
-    supply_chain_id: supplyChainId,
-    organisation_id: organisationId,
-  });
+  try {
+    // Delete in FK-safe order: edges → nodes → supply_chain
+    await supabaseServer.from('edges').delete().eq('supply_chain_id', supplyChainId);
+    await supabaseServer.from('nodes').delete().eq('supply_chain_id', supplyChainId);
+    const { error } = await supabaseServer
+      .from('supply_chains')
+      .delete()
+      .eq('supply_chain_id', supplyChainId);
+
+    if (error) {
+      console.error('Error deleting supply chain:', error);
+      return { data: null, error: error.message };
+    }
+
+    return { data: { status: 'success', supply_chain_id: supplyChainId }, error: null };
+  } catch (err: any) {
+    console.error('Critical error in deleteSupplyChainAction:', err);
+    return { data: null, error: err.message };
+  }
 }
 
 export async function getSupplyChainByIdAction(supplyChainId: string) {

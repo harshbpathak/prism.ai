@@ -29,7 +29,7 @@ export function useSaveAndValidate({
   const [showValidationDialog, setShowValidationDialog] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
-  const performSave = useCallback(async (): Promise<string | null> => {
+  const performSave = useCallback(async (customName?: string, customDesc?: string): Promise<string | null> => {
     setIsSaving(true);
     try {
       const connections = edges.map(edge => {
@@ -54,8 +54,8 @@ export function useSaveAndValidate({
       const urlParams = new URLSearchParams(window.location.search);
       const saveNameFromUrl = urlParams.get('saveName');
       const saveDescriptionFromUrl = urlParams.get('saveDescription');
-      const finalSupplyChainName = saveNameFromUrl || supplyChainName;
-      const finalDescription = saveDescriptionFromUrl || description;
+      const finalSupplyChainName = customName || saveNameFromUrl || supplyChainName;
+      const finalDescription = customDesc || saveDescriptionFromUrl || description;
       
       // Extract form data: prioritize compressed 'form' param, fallback to individual params
       let formDataFromUrl = null;
@@ -91,8 +91,14 @@ export function useSaveAndValidate({
         const storedData = localStorage.getItem(`supplyChain-${selectedSupplyChain}`);
         if (storedData) formDataFromLocalStorage = JSON.parse(storedData);
       } catch (error) { console.error('Error parsing localStorage data:', error); }
+      const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      // If the current twin ID is not a valid UUID (e.g. legacy "twin-timestamp" format),
+      // generate a fresh UUID so Supabase doesn't reject the insert.
+      const effectiveSupplyChainId = UUID_REGEX.test(selectedSupplyChain)
+        ? selectedSupplyChain
+        : crypto.randomUUID();
       const supplyChainData = {
-        id: selectedSupplyChain, name: finalSupplyChainName, description: finalDescription,
+        id: effectiveSupplyChainId, name: finalSupplyChainName, description: finalDescription,
         nodes: nodesWithPositions, edges, connections, timestamp: new Date().toISOString(),
         formData: formDataFromLocalStorage || formDataFromUrl,
         organisation: {
@@ -107,6 +113,20 @@ export function useSaveAndValidate({
       // has been saved and provide the new supply_chain_id so that follow-up dialogs
       // like IntelligenceAnalysisDialog can be opened consistently.
       if (typeof window !== 'undefined' && savedData?.supply_chain_id) {
+        if (selectedSupplyChain !== savedData.supply_chain_id) {
+          // Pre-cache the saved data under the new ID so the canvas doesn't flash
+          // "Not found" if the user navigates to the new twinId URL later.
+          localStorage.setItem(`supplyChain-${savedData.supply_chain_id}`, JSON.stringify(supplyChainData));
+          // Cleanup the old dummy key if it was a transient ID (UUID format always)
+          const wasDummy = !selectedSupplyChain.includes('-') || selectedSupplyChain !== savedData.supply_chain_id;
+          if (wasDummy) {
+            localStorage.removeItem(`supplyChain-${selectedSupplyChain}`);
+          }
+        }
+
+        // NOTE: Do NOT call router.push here — that would unmount the canvas before
+        // IntelligenceAnalysisDialog can open. The toolbar/dialog will handle navigating
+        // to the new twinId after the analysis dialog completes.
         window.dispatchEvent(
           new CustomEvent('supply_chain_saved', {
             detail: { supplyChainId: savedData.supply_chain_id },
@@ -130,7 +150,7 @@ export function useSaveAndValidate({
     }
   }, [nodes, edges, selectedSupplyChain, supplyChainName, description, userData, router]);
 
-  const handleSave = useCallback(async (): Promise<string | null> => {
+  const handleSave = useCallback(async (customName?: string, customDesc?: string): Promise<string | null> => {
     try {
       const issues = validateSupplyChain(nodes, edges);
       
@@ -149,7 +169,7 @@ export function useSaveAndValidate({
         console.warn('⚠️ [Save] Proceeding with warnings:', warnings.map(w => w.message));
       }
       
-      return await performSave();
+      return await performSave(customName, customDesc);
     } catch (error) {
       console.error('❌ [useSaveAndValidate] Error during handleSave:', error);
       console.error('❌ [useSaveAndValidate] Error details:', {

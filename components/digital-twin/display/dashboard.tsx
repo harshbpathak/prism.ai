@@ -293,8 +293,12 @@ export default function DigitalTwinDashboard() {
               {supplyChains.map((chain) => {
                 const riskLevel = chain.form_data?.risks?.length > 2 ? 'High' :
                                   chain.form_data?.risks?.length > 1 ? 'Medium' : 'Low';
-                const date = new Date(chain.timestamp).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+                // Fallback to created_at if timestamp is missing from the database record
+                const chainDate = chain.timestamp || (chain as any).created_at || new Date().toISOString();
+                const date = new Date(chainDate).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
                 const industry = chain.form_data?.industry || chain.organisation?.industry || 'General';
+                const nodeCount = chain.nodes?.length || 0;
+                const edgeCount = chain.edges?.length || 0;
 
                 return (
                   <div key={chain.supply_chain_id} className="group grid grid-cols-[2fr_1fr_1fr_1fr_auto] items-center px-6 py-3.5 gap-4 hover:bg-slate-50 dark:hover:bg-slate-900/50 transition-colors">
@@ -304,18 +308,19 @@ export default function DigitalTwinDashboard() {
                         setView(`view:${chain.supply_chain_id}`);
                       }}
                     >
-                      <div className="w-7 h-7 border border-slate-200 dark:border-slate-800 flex items-center justify-center shrink-0 text-[10px] font-bold text-slate-500 mt-0.5">
-                        {chain.name?.charAt(0)?.toUpperCase() || '?'}
+                      <div className="w-7 h-7 border border-slate-200 dark:border-slate-800 flex items-center justify-center shrink-0 text-[10px] font-bold text-slate-500 mt-0.5 uppercase">
+                        {chain.name?.charAt(0) || '?'}
                       </div>
-                      <div className="min-w-0">
+                      <div className="min-w-0 flex flex-col justify-center">
                         <p className="text-sm font-medium text-black dark:text-white truncate group-hover:underline underline-offset-2">
                           {chain.name || 'Unnamed Network'}
                         </p>
                         <p className="text-[11px] text-slate-500 truncate mt-0.5">
-                          {chain.description || `${chain.nodes?.length || 0} nodes · ${chain.edges?.length || 0} connections`}
+                          {nodeCount} nodes · {edgeCount} connections
                         </p>
                       </div>
                     </button>
+
 
                     <span className="text-xs text-slate-600 dark:text-slate-400 truncate">{industry}</span>
 

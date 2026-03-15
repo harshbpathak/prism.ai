@@ -1,5 +1,6 @@
 import { FC, useState, useEffect } from 'react';
 import { useQueryState, parseAsString } from 'nuqs';
+import { useRouter } from 'next/navigation';
 import SaveSupplyChainDialog from '../forms/SaveSupplyChainDialog';
 import IntelligenceAnalysisDialog from '../IntelligenceAnalysisDialog';
 import FloatingSaveButton from './FloatingSaveButton';
@@ -8,7 +9,7 @@ import { Node, Edge } from 'reactflow';
 interface SimulationToolbarProps {
   selectedSupplyChain: string;
   setSelectedSupplyChain: (id: string) => void;
-  onSave: () => Promise<string | null>;
+  onSave: (name?: string, desc?: string) => Promise<string | null>;
   simulationMode: boolean;
   setSimulationMode: (mode: boolean) => void;
   supplyChainName?: string;
@@ -44,6 +45,7 @@ const SimulationToolbar: FC<SimulationToolbarProps> = ({
   const [nameParam] = useQueryState('saveName', parseAsString);
   const [descriptionParam] = useQueryState('saveDescription', parseAsString);
   
+  const router = useRouter();
   const [inputValue, setInputValue] = useState('');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -118,7 +120,7 @@ const SimulationToolbar: FC<SimulationToolbarProps> = ({
       setInputValue(name);
 
       // Call the original save function and retrieve the generated supply chain ID
-      const supplyChainId = await onSave();
+      const supplyChainId = await onSave(name, desc);
 
       // If the backend returned a valid ID, store it so the effect can trigger
       // and close the save dialog.
@@ -154,7 +156,15 @@ const SimulationToolbar: FC<SimulationToolbarProps> = ({
       />
       <IntelligenceAnalysisDialog
         isOpen={isAnalysisDialogOpen}
-        onClose={() => setIsAnalysisDialogOpen(false)}
+        onClose={() => {
+          setIsAnalysisDialogOpen(false);
+          // Navigate to the new twinId URL AFTER the dialog closes,
+          // so the canvas isn't unmounted while the dialog is still shown.
+          if (analysisSupplyChainId) {
+            router.push(`/digital-twin?twinId=${analysisSupplyChainId}`);
+          }
+          setAnalysisSupplyChainId(null);
+        }}
         supplyChainId={analysisSupplyChainId}
       />
     </>
