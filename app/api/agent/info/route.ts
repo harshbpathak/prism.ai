@@ -4,6 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { streamText, generateText } from 'ai';
 import { AgentBuilder, BaseTool, AiSdkLlm } from "@iqai/adk";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { tavily } from '@tavily/core';
@@ -90,15 +91,46 @@ class ProductionIntelligentAgent {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { nodeId, focusArea } = body;
-
-    if (!nodeId) return NextResponse.json({ error: "Missing nodeId" }, { status: 400 });
-
-    const agent = new ProductionIntelligentAgent();
-    const result = await agent.gatherIntelligence(nodeId, focusArea);
+    const { supply_chain_id, nodeId, focusArea, messages } = body;
     
-    return NextResponse.json({ success: true, data: result });
+    // We expect either nodeId or supply_chain_id in the body (the frontend sends supply_chain_id)
+    const targetId = nodeId || supply_chain_id;
+    if (!targetId) return NextResponse.json({ error: "Missing Target ID" }, { status: 400 });
+
+    const google = createGoogleGenerativeAI({
+      apiKey: getAIKeyForModule("agents"),
+    });
+
+    const systemPrompt = `
+      Gather intelligence for supply chain node or ID: ${targetId}
+      Focus Area: ${focusArea || 'all'}
+      
+      Search for current disruptions, weather impacts, and market trends.
+      Provide a detailed summary and risk score (0-100).
+    `;
+
+    // Extract the latest query from messages if they exist, otherwise use the system prompt
+    const promptMessage = messages && messages.length > 0 
+      ? messages[messages.length - 1].content 
+      : systemPrompt;
+
+    if (body.stream) {
+      const result = await streamText({
+        model: google(AI_MODELS.agents),
+        system: systemPrompt,
+        messages: messages || [{ role: 'user', content: promptMessage }],
+      });
+      return result.toDataStreamResponse();
+    } else {
+      const result = await generateText({
+        model: google(AI_MODELS.agents),
+        system: systemPrompt,
+        messages: messages || [{ role: 'user', content: promptMessage }],
+      });
+      return NextResponse.json({ success: true, data: result.text });
+    }
   } catch (error) {
+    console.error('[INTEL-AGENT] ❌ Error:', error);
     return NextResponse.json({ 
       success: false, 
       error: error instanceof Error ? error.message : "Internal Error" 

@@ -122,7 +122,9 @@
     "uuid": "^11.1.0",
     "vaul": "^0.9.6",
     "web-worker": "^1.5.0",
-    "zod": "^3.24.2",
+    "zod": "3.24.2",
+    "zod-to-json-schema": "^3.25.1",
+    "zod-v4-mini": "npm:zod@4.0.0-beta.0",
     "zustand": "^5.0.3"
   },
   "devDependencies": {

@@ -23,6 +23,7 @@ Built on **Next.js 15** with **Google Gemini AI**, the platform provides an imme
 - Drag-and-drop node management (suppliers, factories, warehouses, distributors, retailers)
 - Real-time connection mapping with transport modes, costs, and risk multipliers
 - Geographic mapping with **Leaflet** integration
+- **Live Status Monitoring**: Nodes change state and appearance based on real-time intelligence and risk levels.
 
 ### 🤖 Multi-Agent AI System
 Six specialized AI agents powered by **Google Gemini** via the **IQ AI ADK** framework:
@@ -36,6 +37,11 @@ Six specialized AI agents powered by **Google Gemini** via the **IQ AI ADK** fra
 | **Strategy** | Mitigation planning and strategic recommendations |
 | **Orchestrator** | Coordinates all agents for comprehensive multi-step analysis |
 
+### 🧠 Memory & Trend Analysis
+- **Mem0 Integration**: Remembers past disruptions and intelligence to identify longitudinal patterns.
+- **Delta Risk Calculation**: Compares current risk levels against historical baselines to highlight escalating threats.
+- **Pattern Recognition**: Detects recurring failure points in the supply chain lifecycle.
+
 ### 💬 AI Chat Interface
 - **CopilotKit**-powered conversational interface embedded in the digital twin
 - Context-aware suggestions based on supply chain topology
@@ -47,11 +53,11 @@ Six specialized AI agents powered by **Google Gemini** via the **IQ AI ADK** fra
 - Cascading failure analysis maps
 - Strategy execution tracking
 
-### 🔬 Simulation Engine
+### 🔬 Simulation Engine (Chaos Simulation)
 - Monte Carlo risk simulations
 - Disruption scenario modeling
 - Multi-variable sensitivity analysis
-- **Requestly Integration**: Used to simulate real-world disruption scenarios by injecting faults and manipulating AI agent API responses in real-time.
+- **Requestly Integration**: Inject artificial disruptions (latency, API failures, price spikes) to test supply chain resilience. Simulated disruptions are reflected instantly on the Digital Twin (pulsing red states) to help planners visualize impact chains.
 
 ### 📰 News Room
 - Curated supply chain news and intelligence
@@ -110,7 +116,7 @@ prism.ai/
 |----------|-----------|
 | **Framework** | Next.js 15 (App Router, Turbopack) |
 | **Language** | TypeScript |
-| **AI Models** | Google Gemini 2.5 Flash via `@ai-sdk/google` |
+| **AI Models** | Google Gemini 2.0 via `@ai-sdk/google` |
 | **Agent Framework** | IQ AI ADK (`@iqai/adk`) |
 | **Chat Interface** | CopilotKit |
 | **Database** | Supabase (PostgreSQL) |
@@ -133,7 +139,7 @@ prism.ai/
 ### Prerequisites
 
 - **Node.js** ≥ 18
-- **pnpm** (recommended) or npm
+- **pnpm** (recommended) or npm/yarn
 - API keys for required services (see Environment Variables)
 
 ### Installation
@@ -146,19 +152,15 @@ cd prism.ai
 # Install dependencies
 pnpm install
 
-# Set up environment variables
-cp .env.example .env
-# Edit .env with your API keys (see below)
-
 # Start the development server
 pnpm dev
 ```
 
 The app will be available at **http://localhost:3000**.
 
-### Environment Variables
+### Environment Setup
 
-Create a `.env` file with the following keys:
+Create a `.env.local` or `.env` file in the root directory:
 
 ```env
 # Supabase
@@ -170,14 +172,11 @@ SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
 # AI Services (Required)
 GOOGLE_GENERATIVE_AI_API_KEY=your_gemini_api_key
 
-# Multi-Key Quota Management (Optional — falls back to main key)
-GOOGLE_API_KEY_ORCHESTRATOR=your_key
-GOOGLE_API_KEY_AGENTS=your_key
-GOOGLE_API_KEY_DIGITAL_TWIN=your_key
-GOOGLE_API_KEY_SUGGESTIONS=your_key
-
 # Web Search
 TAVILY_API_KEY=your_tavily_key
+
+# Weather
+OPENWEATHER_API_KEY=your_openweather_key
 
 # Memory
 MEM0_API_KEY=your_mem0_key
@@ -209,53 +208,20 @@ NEXT_PUBLIC_COPILOTKIT_ENABLED=true
 | `POST` | `/api/agent/impact` | Quantitative risk impact assessment |
 | `POST` | `/api/agent/scenario` | Disruption scenario generation |
 | `POST` | `/api/agent/strategy` | Mitigation strategy planning |
-| `POST` | `/api/agent/info` | Intelligence gathering |
-
-### Supporting Endpoints
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `POST` | `/api/suggestions` | AI-powered query suggestions |
-| `POST` | `/api/copilotkit` | Main CopilotKit chat endpoint |
-| `POST` | `/api/copilotkit-digital-twin` | Digital twin chat endpoint |
-| `POST` | `/api/news` | Supply chain news aggregation |
+| `POST` | `/api/agent/info` | Intelligence gathering & node analysis |
 
 ---
 
-## 🧠 AI Model Configuration
+## 🤝 Roadmap
 
-All AI model settings are centralized in `lib/ai-config.ts`:
-
-```typescript
-export const AI_MODELS = {
-  chat: 'gemini-2.5-flash',        // CopilotKit chat
-  chatLite: 'gemini-2.5-flash',    // Lightweight responses
-  agents: 'gemini-2.5-flash',      // All specialized agents
-  suggestions: 'gemini-2.5-flash', // Background suggestions
-};
-```
-
-To swap models globally, edit this single file. The system supports optional per-module API keys for **quota management** across free-tier limits.
-
----
-
-## 📜 Scripts
-
-```bash
-pnpm dev          # Start development server (Turbopack)
-pnpm build        # Production build
-pnpm start        # Start production server
-pnpm lint         # Run ESLint
-```
-
----
+- [ ] Geographic Event Correlation (Mapping events to physical routes).
+- [ ] Predictive Demand Forecasting using historical Supabase data.
+- [ ] Multi-Model LLM Ensemble for risk verification.
+- [ ] Automated mitigation execution via IQAI ADK.
 
 ## 📄 License
 
-This project is private and proprietary.
+This project is developed for the **Prism Hackathon**.
 
 ---
-
-<p align="center">
-  Built with ❤️ using Next.js, Google Gemini AI, and the IQ AI ADK
-</p>
+*Built with ❤️ by the PRISM Team.*
