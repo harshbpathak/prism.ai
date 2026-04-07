@@ -18,13 +18,7 @@ const nextConfig = {
     },
   },
   serverExternalPackages: ['@modelcontextprotocol/sdk'],
-  webpack: (config, { isServer, webpack }) => {
-    config.plugins.push(
-      new webpack.NormalModuleReplacementPlugin(/^zod\/v3$/, 'zod'),
-      new webpack.NormalModuleReplacementPlugin(/^zod\/v4-mini$/, 'zod-v4-mini'),
-      new webpack.NormalModuleReplacementPlugin(/^zod\/v4$/, 'zod-v4-mini')
-    );
-    
+  webpack: (config, { isServer }) => {
     if (!isServer) {
       config.resolve.fallback = {
         ...config.resolve.fallback,

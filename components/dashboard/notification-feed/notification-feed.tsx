@@ -15,6 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 
 // Import API functions and types
 import { getNotifications, markNotificationAsRead, markAllNotificationsAsRead } from "@/lib/api/notifications"
+import { getUserSupplyChains } from "@/lib/api/supply-chain"
 import { getUserData } from "@/utils/functions/userUtils"
 import type { Tables } from "@/lib/types/database"
 
@@ -29,9 +30,12 @@ export function NotificationFeed() {
   const [showMore, setShowMore] = useState(false)
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [user, setUser] = useState<Tables<'users'> | null>(null)
+  const [supplyChains, setSupplyChains] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedNotification, setSelectedNotification] = useState<Notification | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
+  const [analyzingNews, setAnalyzingNews] = useState(false)
+  const [newsAnalysisResults, setNewsAnalysisResults] = useState<any[]>([])
   const { toast } = useToast()
 
   // Fetch user data
@@ -40,8 +44,12 @@ export function NotificationFeed() {
       try {
         const userData = await getUserData()
         setUser(userData)
+        if (userData?.id) {
+          const fetchedChains = await getUserSupplyChains(userData.id)
+          setSupplyChains(fetchedChains?.data || [])
+        }
       } catch (error) {
-        console.error('Error fetching user:', error)
+        console.error('Error fetching user or supply chains:', error)
       }
     }
     fetchUser()
@@ -69,11 +77,79 @@ export function NotificationFeed() {
       }
     }
 
-    fetchNotifications()
-    const interval = setInterval(fetchNotifications, 60000) // Refresh every minute
+    // Real-time news polling 
+    let isNewsPolling = false;
+    const fetchLiveNews = async () => {
+        if (isNewsPolling) return;
+        isNewsPolling = true;
+        try {
+            const response = await fetch('/api/agent/news-polling')
+            if (!response.ok) return;
 
-    return () => clearInterval(interval)
-  }, [user, toast])
+            const data = await response.json()
+            if (data.notifications && data.notifications.length > 0) {
+                setNotifications(prev => {
+                    const existingIds = new Set(prev.map(n => n.notification_id))
+                    const newUnique = data.notifications.filter((n: Notification) => !existingIds.has(n.notification_id))
+                    
+                    if (newUnique.length === 0) return prev; 
+
+                    const combined = [...newUnique, ...prev].sort((a, b) => {
+                        const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
+                        const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
+                        return dateB - dateA;
+                    });
+                    return combined;
+                })
+            }
+        } catch (error) {
+            console.error('Failed to fetch live news stream:', error)
+        } finally {
+            isNewsPolling = false;
+        }
+    }
+
+    // Autonomous Threat Scanning
+    let isScanning = false;
+    const runThreatScans = async () => {
+        if (!user?.id || supplyChains.length === 0 || isScanning) return;
+        isScanning = true;
+        
+        try {
+            // Pick a supply chain to scan (simple round robin or just the first few to avoid API limits)
+            // For now, let's just trigger a scan for the first available supply chain
+            const targetChain = supplyChains[0];
+            if (!targetChain) return;
+
+            console.log(`[DASHBOARD-FEED] Triggering autonomous threat scan for SC: ${targetChain.supply_chain_id}`);
+            const res = await fetch(`/api/agent/automated-alerts?supplyChainId=${targetChain.supply_chain_id}&userId=${user.id}`);
+            const data = await res.json();
+            
+            if (data.success && data.alertsGenerated > 0) {
+               // A new threat was found and added to the DB.
+               // It will be picked up on the next fetchNotifications cycle or we can fetch immediately.
+               fetchNotifications();
+            }
+        } catch (error) {
+            console.error('Background threat scan failed:', error)
+        } finally {
+            isScanning = false;
+        }
+    }
+
+    fetchNotifications()
+    fetchLiveNews()
+    
+    const dbInterval = setInterval(fetchNotifications, 30000) // Refresh DB every 30s
+    const newsInterval = setInterval(fetchLiveNews, 120000) // Live news every 2 min
+    const scanInterval = setInterval(runThreatScans, 180000) // Deep AI threat scan every 3 min
+
+    return () => {
+        clearInterval(dbInterval)
+        clearInterval(newsInterval)
+        clearInterval(scanInterval)
+    }
+  }, [user, supplyChains, toast])
 
   const handleMarkAsRead = async (id: string) => {
     try {
@@ -118,7 +194,80 @@ export function NotificationFeed() {
 
   const handleViewDetails = (notification: Notification) => {
     setSelectedNotification(notification)
+    setNewsAnalysisResults([]) // Clear previous analysis when opening new modal
     setDialogOpen(true)
+  }
+
+  const handleAnalyzeNewsImpact = async () => {
+    if (!selectedNotification || supplyChains.length === 0) return;
+    
+    setAnalyzingNews(true);
+    setNewsAnalysisResults([]); // Reset
+    
+    try {
+        const results = [];
+        
+        // Let's run it against all user supply chains, or just the first 3 if there are many to avoid ratelimits
+        const targets = supplyChains.slice(0, 3);
+        
+        for (const chain of targets) {
+            // 1. Create the simulation scenario from the news
+            const simRes = await fetch('/api/agent/news-simulation', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    notificationId: selectedNotification.notification_id,
+                    supplyChainId: chain.supply_chain_id,
+                    notification: selectedNotification
+                })
+            });
+            const simData = await simRes.json();
+            
+            if (simData.success && simData.simulation_id) {
+                // 2. Run the impact agent against this new simulation (force refresh to get fresh AI)
+                const impactRes = await fetch('/api/agent/impact', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        simulationId: simData.simulation_id,
+                        supplyChainId: chain.supply_chain_id,
+                        forceRefresh: true
+                    })
+                });
+                const impactData = await impactRes.json();
+                
+                // The impact agent returns results in impactData.data
+                const analysis = impactData.data;
+
+                results.push({
+                    supplyChainName: chain.name || 'Supply Chain',
+                    chain_id: chain.supply_chain_id,
+                    simulation_id: simData.simulation_id,
+                    impactMetrics: analysis?.metrics || null,
+                    cascadingEffects: analysis?.cascadingEffects || [],
+                    keyFindings: analysis?.keyFindings || [],
+                    error: impactData.error || null
+                });
+            } else {
+                results.push({
+                    supplyChainName: chain.name || 'Supply Chain',
+                    error: simData.error || "Failed to scenariofy news"
+                });
+            }
+        }
+        
+        setNewsAnalysisResults(results);
+        
+    } catch (error) {
+        console.error("Failed to analyze news impact:", error);
+        toast({
+            title: "Analysis Failed",
+            description: "An error occurred while running the AI simulation.",
+            variant: "destructive"
+        })
+    } finally {
+        setAnalyzingNews(false);
+    }
   }
 
   const getTypeIcon = (type: NotificationType) => {
@@ -245,6 +394,13 @@ export function NotificationFeed() {
                         <div className="flex items-start justify-between mb-2">
                           <div className="flex items-center gap-2">
                             <p className="font-medium text-gray-900 dark:text-gray-100 text-base leading-relaxed">{notification.title}</p>
+                            {/* Visual indicator for Live News */}
+                            {notification.notification_type === 'live_news_alert' && (
+                                <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded border bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800 text-[10px] uppercase font-bold tracking-wider w-fit shrink-0">
+                                    <div className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-pulse"></div>
+                                    Live News
+                                </div>
+                            )}
                             {!isRead && (
                               <span className="h-2 w-2 rounded-full bg-black dark:bg-white flex-shrink-0 mt-1"></span>
                             )}
@@ -591,6 +747,122 @@ export function NotificationFeed() {
                     </>
                   )
                 })()}
+
+                {/* --- AI IMPACT ANALYSIS SECTION --- */}
+                <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
+                   <h4 className="font-medium text-gray-900 dark:text-gray-100 mb-3 flex items-center gap-2">
+                       <span className="w-2 h-2 rounded-full bg-purple-500 animate-pulse"></span>
+                       AI Impact Simulation
+                   </h4>
+                   <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
+                       Run this real-world event as a scenario against your supply chains to quantify the potential financial and operational fallout.
+                   </p>
+                   
+                   {newsAnalysisResults.length === 0 && !analyzingNews && (
+                       <Button 
+                           onClick={handleAnalyzeNewsImpact} 
+                           disabled={supplyChains.length === 0}
+                           className="w-full bg-purple-600 hover:bg-purple-700 text-white"
+                       >
+                           {supplyChains.length === 0 ? "No Active Supply Chains" : "Analyze Impact on My Supply Chains"}
+                       </Button>
+                   )}
+                   
+                   {analyzingNews && (
+                       <div className="flex flex-col items-center justify-center p-6 space-y-3 bg-gray-50 dark:bg-gray-900 rounded-lg border border-dashed border-gray-300 dark:border-gray-700">
+                           <div className="w-6 h-6 border-2 border-purple-500 border-t-transparent rounded-full animate-spin"></div>
+                           <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Running Multi-Agent Simulation...</p>
+                           <p className="text-xs text-gray-500 text-center">Converting news context to scenario parameters and calculating network cascading effects.</p>
+                       </div>
+                   )}
+                   
+                   {newsAnalysisResults.length > 0 && !analyzingNews && (
+                       <div className="space-y-4">
+                           {newsAnalysisResults.map((res, idx) => (
+                               <div key={idx} className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-4 shadow-sm">
+                                   <div className="flex items-center justify-between mb-3 border-b border-gray-100 dark:border-gray-800 pb-2">
+                                       <h5 className="font-semibold text-sm text-gray-900 dark:text-gray-100">{res.supplyChainName}</h5>
+                                       {res.error ? (
+                                           <Badge variant="destructive" className="text-[10px]">Error</Badge>
+                                       ) : (
+                                           <Badge variant="outline" className="text-[10px] bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800">Analysis Complete</Badge>
+                                       )}
+                                   </div>
+                                   
+                                    {res.error ? (
+                                        <p className="text-xs text-red-500 font-medium">{res.error}</p>
+                                    ) : res.impactMetrics ? (
+                                        <div className="space-y-5">
+                                            {/* Primary Metrics */}
+                                            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                                                <div className="bg-gray-50 dark:bg-gray-800 p-2.5 rounded-md border border-gray-100 dark:border-gray-700">
+                                                    <p className="text-[10px] text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1 font-bold">Total Cost</p>
+                                                    <p className="text-sm font-bold text-red-600 dark:text-red-400">{res.impactMetrics.totalCostImpact}</p>
+                                                </div>
+                                                <div className="bg-gray-50 dark:bg-gray-800 p-2.5 rounded-md border border-gray-100 dark:border-gray-700">
+                                                    <p className="text-[10px] text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1 font-bold">Delay</p>
+                                                    <p className="text-sm font-bold text-amber-600 dark:text-amber-400">{res.impactMetrics.averageDelay}</p>
+                                                </div>
+                                                <div className="bg-gray-50 dark:bg-gray-800 p-2.5 rounded-md border border-gray-100 dark:border-gray-700">
+                                                    <p className="text-[10px] text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1 font-bold">Resilience</p>
+                                                    <p className="text-sm font-bold text-blue-600 dark:text-blue-400">{res.impactMetrics.networkResilience}/100</p>
+                                                </div>
+                                                <div className="bg-gray-50 dark:bg-gray-800 p-2.5 rounded-md border border-gray-100 dark:border-gray-700">
+                                                    <p className="text-[10px] text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1 font-bold">Recovery</p>
+                                                    <p className="text-sm font-bold text-purple-600 dark:text-purple-400">{res.impactMetrics.recoveryTime}</p>
+                                                </div>
+                                            </div>
+
+                                            {/* Node Specific Impact */}
+                                            {res.cascadingEffects && res.cascadingEffects.length > 0 && (
+                                                <div className="space-y-2">
+                                                    <h6 className="text-[11px] font-bold text-gray-900 dark:text-gray-100 uppercase tracking-widest flex items-center gap-1.5">
+                                                        <MapPin className="w-3 h-3 text-red-500" />
+                                                        Primary Node Impact
+                                                    </h6>
+                                                    <div className="bg-red-50/50 dark:bg-red-900/10 border border-red-100 dark:border-red-900/30 rounded-lg p-3">
+                                                        <div className="flex items-center justify-between mb-2">
+                                                            <p className="text-xs font-bold text-gray-900 dark:text-gray-100">{res.cascadingEffects[0].affectedNode}</p>
+                                                            <Badge className="text-[9px] h-4 bg-red-600 dark:bg-red-500 text-white border-none">{res.cascadingEffects[0].severity}</Badge>
+                                                        </div>
+                                                        <div className="grid grid-cols-2 gap-4">
+                                                            <div>
+                                                                <p className="text-[9px] text-gray-500 dark:text-gray-400 uppercase font-bold">Direct Financial Hit</p>
+                                                                <p className="text-xs font-semibold text-red-700 dark:text-red-400">{res.cascadingEffects[0].financialImpact}</p>
+                                                            </div>
+                                                            <div>
+                                                                <p className="text-[9px] text-gray-500 dark:text-gray-400 uppercase font-bold">Timeline</p>
+                                                                <p className="text-xs font-semibold text-gray-700 dark:text-gray-300">{res.cascadingEffects[0].timeline}</p>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* Key Findings */}
+                                            {res.keyFindings && res.keyFindings.length > 0 && (
+                                                <div className="space-y-2">
+                                                    <h6 className="text-[11px] font-bold text-gray-900 dark:text-gray-100 uppercase tracking-widest">Strategic Findings</h6>
+                                                    <ul className="space-y-1.5">
+                                                        {res.keyFindings.slice(0, 3).map((finding: string, idx: number) => (
+                                                            <li key={idx} className="text-[11px] text-gray-600 dark:text-gray-400 flex items-start gap-2">
+                                                                <span className="mt-1 w-1 h-1 rounded-full bg-gray-400 shrink-0"></span>
+                                                                {finding}
+                                                            </li>
+                                                        ))}
+                                                    </ul>
+                                                </div>
+                                            )}
+                                        </div>
+                                    ) : (
+                                        <p className="text-xs text-gray-500">No impact metrics generated.</p>
+                                    )}
+
+                               </div>
+                           ))}
+                       </div>
+                   )}
+                </div>
 
                 {/* Actions */}
                 <div className="flex justify-between items-center pt-4 border-t border-gray-200 dark:border-gray-700">

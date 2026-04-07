@@ -208,11 +208,19 @@ function NotificationItem({ notification, onMarkAsRead }: { notification: Notifi
                         </div>
                     </div>
                     {truncatedMessage && (
-                        <div className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+                        <div className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed mb-2">
                             {truncatedMessage}
                         </div>
                     )}
                     
+                    {/* Visual indicator for Live News */}
+                    {notification.notification_type === 'live_news_alert' && (
+                        <div className="inline-flex items-center gap-1.5 px-2 py-0.5 mb-2 rounded border bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800 text-[10px] uppercase font-bold tracking-wider w-fit shrink-0">
+                            <div className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-pulse"></div>
+                            Live News
+                        </div>
+                    )}
+
                     {/* Display sources if available */}
                     {citations?.sources && citations.sources.length > 0 && (
                         <div className="flex flex-wrap gap-1">
@@ -292,9 +300,55 @@ export function NotificationDropdown() {
         }
         fetchNotifications()
 
-        const interval = setInterval(fetchNotifications, 60000) // Refresh every minute
+        const dbInterval = setInterval(fetchNotifications, 60000) // Refresh DB every minute
 
-        return () => clearInterval(interval)
+        // Real-time news polling (every 5 seconds)
+        let isPolling = false;
+        const fetchLiveNews = async () => {
+            if (isPolling) return;
+            isPolling = true;
+            try {
+                const response = await fetch('/api/agent/news-polling')
+                if (!response.ok) return;
+
+                const data = await response.json()
+                if (data.notifications && data.notifications.length > 0) {
+                    setNotifications(prev => {
+                        // Create a map to ensure uniqueness by ID
+                        const existingIds = new Set(prev.map(n => n.notification_id))
+                        const newUnique = data.notifications.filter((n: Notification) => !existingIds.has(n.notification_id))
+                        
+                        if (newUnique.length === 0) return prev; // No actual new items
+
+                        // Update unread count based on actual new unique items
+                        setUnreadCount(prevCount => prevCount + newUnique.length)
+
+                        // Keep DB items sorted by date, but prepend the absolute newest live ones
+                        // Combine, sort by date descending
+                        const combined = [...newUnique, ...prev].sort((a, b) => {
+                            const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
+                            const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
+                            return dateB - dateA;
+                        });
+
+                        return combined;
+                    })
+                }
+            } catch (error) {
+                console.error('Failed to fetch live news stream:', error)
+            } finally {
+                isPolling = false;
+            }
+        }
+        
+        // Initial fetch for news
+        fetchLiveNews()
+        const newsInterval = setInterval(fetchLiveNews, 120000) // Live news every 2 min (mitigate API limits)
+
+        return () => {
+            clearInterval(dbInterval)
+            clearInterval(newsInterval)
+        }
     }, [user])
 
     const handleMarkAsRead = async (notificationId: string) => {
