@@ -2,7 +2,7 @@
   <h1 align="center">🔷 PRISM.ai</h1>
   <p align="center"><strong>Product Route Intelligence and Supply Mapping</strong></p>
   <p align="center">
-    An AI-powered(IQ AI ADK) supply chain digital twin platform for real-time risk analysis, forecasting, scenario simulation(Requestly), and strategic decision-making.
+    An AI-powered (IQ AI ADK) supply chain digital twin platform with <strong>ML-driven risk prediction (XGBoost)</strong>, real-time risk analysis, forecasting, scenario simulation (Requestly), and strategic decision-making.
   </p>
 </p>
 
@@ -10,9 +10,9 @@
 
 ## ✨ Overview
 
-**PRISM.ai** is a next-generation supply chain intelligence platform that combines **AI agents**, **digital twin visualization**, and **multi-agent orchestration** to help businesses proactively identify, assess, and mitigate supply chain risks.
+**PRISM.ai** is a next-generation supply chain intelligence platform that combines **AI agents**, **digital twin visualization**, **ML-powered risk prediction**, and **multi-agent orchestration** to help businesses proactively identify, assess, and mitigate supply chain risks.
 
-Built on **Next.js 15** with **Google Gemini AI**, the platform provides an immersive experience for supply chain professionals to model their networks, simulate disruptions, and receive actionable intelligence — all in real time.
+Built on **Next.js 15** with **Google Gemini AI** and an **XGBoost ML risk engine**, the platform provides an immersive experience for supply chain professionals to model their networks, predict delivery risks, simulate disruptions, and receive actionable intelligence — all in real time.
 
 ---
 
@@ -59,6 +59,14 @@ Six specialized AI agents powered by **Google Gemini** via the **IQ AI ADK** fra
 - Multi-variable sensitivity analysis
 - **Requestly Integration**: Inject artificial disruptions (latency, API failures, price spikes) to test supply chain resilience. Simulated disruptions are reflected instantly on the Digital Twin (pulsing red states) to help planners visualize impact chains.
 
+### 🧠 ML Risk Prediction
+- **XGBoost-powered** binary classifier (High Risk / Low Risk) trained on the **DataCo Supply Chain** dataset (180K orders)
+- **59 engineered features** from 30 raw columns — target encoding, temporal, interaction, and financial features
+- **Model Performance**: ROC-AUC 0.885, Accuracy 79.4%, F1 0.794
+- **FastAPI backend** for real-time single-order and batch CSV predictions (< 1ms inference)
+- Animated risk gauge, top contributing factors visualization, and confidence scoring in the UI
+- Top predictors: Shipping Mode, schedule tightness, mode×region interactions
+
 ### 📰 News Room
 - Curated supply chain news and intelligence
 - Web scraping with metadata extraction
@@ -74,6 +82,7 @@ prism.ai/
 │   ├── (main)/                    # Authenticated routes
 │   │   ├── dashboard/             # Analytics dashboard
 │   │   ├── digital-twin/          # Supply chain visualization
+│   │   ├── risk-prediction/       # ML risk prediction UI       ← NEW
 │   │   ├── simulation/            # Simulation engine
 │   │   ├── news-room/             # Intelligence news feed
 │   │   └── profile/               # User profile
@@ -86,6 +95,9 @@ prism.ai/
 │   │   │   ├── scenario/          # Scenario generation agent
 │   │   │   ├── strategy/          # Strategy planning agent
 │   │   │   └── strategy-execution/# Strategy execution agent
+│   │   ├── risk-prediction/       # ML model proxy              ← NEW
+│   │   │   ├── route.ts           # GET meta + POST predict
+│   │   │   └── batch/route.ts     # POST batch CSV predict
 │   │   ├── coordination/          # Agent coordination layer
 │   │   ├── copilotkit*/           # CopilotKit chat endpoints
 │   │   ├── suggestions/           # AI suggestion engine
@@ -94,6 +106,10 @@ prism.ai/
 │   └── signin/                    # Authentication UI
 ├── components/
 │   ├── digital-twin/              # Twin visualization components
+│   ├── risk-prediction/           # ML prediction components    ← NEW
+│   │   ├── risk-prediction-page.tsx
+│   │   ├── risk-gauge.tsx         # Animated SVG radial gauge
+│   │   └── factor-bars.tsx        # Top factor bar chart
 │   ├── simulation/                # Simulation UI components
 │   ├── dashboard/                 # Dashboard widgets
 │   ├── orchestrator/              # Agent orchestration UI
@@ -118,6 +134,9 @@ prism.ai/
 | **Language** | TypeScript |
 | **AI Models** | Google Gemini 2.0 via `@ai-sdk/google` |
 | **Agent Framework** | IQ AI ADK (`@iqai/adk`) |
+| **ML Model** | XGBoost (GPU-accelerated, 59 features, AUC 0.885) |
+| **ML API** | FastAPI (Python) — single & batch prediction |
+| **ML Libraries** | scikit-learn, pandas, numpy, SHAP |
 | **Chat Interface** | CopilotKit |
 | **Database** | Supabase (PostgreSQL) |
 | **Caching** | Upstash Redis |
@@ -139,6 +158,7 @@ prism.ai/
 ### Prerequisites
 
 - **Node.js** ≥ 18
+- **Python** ≥ 3.10 (for the ML risk prediction API)
 - **pnpm** (recommended) or npm/yarn
 - API keys for required services (see Environment Variables)
 
@@ -156,7 +176,23 @@ pnpm install
 pnpm dev
 ```
 
-The app will be available at **http://localhost:3000**.
+### ML Risk Prediction API
+
+```bash
+# Navigate to the Market-Supply directory
+cd ../Market-Supply
+
+# Install Python dependencies
+pip install xgboost scikit-learn pandas numpy fastapi uvicorn python-multipart joblib shap
+
+# Train the model (first time only, ~7s on GPU)
+python ml/train.py
+
+# Start the FastAPI server
+uvicorn api.main:app --reload --port 8001
+```
+
+The Next.js app at **http://localhost:3000** and the ML API at **http://localhost:8001** must run simultaneously.
 
 ### Environment Setup
 
@@ -191,6 +227,9 @@ NEXT_PUBLIC_SENTRY_DSN=your_sentry_dsn
 
 # CopilotKit
 NEXT_PUBLIC_COPILOTKIT_ENABLED=true
+
+# ML Risk Prediction API (Optional — defaults to localhost:8001)
+RISK_MODEL_API_URL=http://localhost:8001
 ```
 
 ---
@@ -210,10 +249,19 @@ NEXT_PUBLIC_COPILOTKIT_ENABLED=true
 | `POST` | `/api/agent/strategy` | Mitigation strategy planning |
 | `POST` | `/api/agent/info` | Intelligence gathering & node analysis |
 
+### ML Risk Prediction Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET`  | `/api/risk-prediction` | Model metadata + dropdown options |
+| `POST` | `/api/risk-prediction` | Single-order risk prediction |
+| `POST` | `/api/risk-prediction/batch` | Batch CSV file prediction |
+
 ---
 
 ## 🤝 Roadmap
 
+- [x] ML-powered delivery risk prediction (XGBoost + FastAPI)
 - [ ] Geographic Event Correlation (Mapping events to physical routes).
 - [ ] Predictive Demand Forecasting using historical Supabase data.
 - [ ] Multi-Model LLM Ensemble for risk verification.

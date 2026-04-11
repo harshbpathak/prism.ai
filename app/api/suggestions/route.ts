@@ -182,13 +182,13 @@ export async function POST(req: Request) {
       });
 
       const result = await generateObject({
-        model: google(AI_MODELS.suggestions),
+        model: google(AI_MODELS.suggestions, { structuredOutputs: false }),
         schema: SupplyChainSuggestionSchema,
         messages: [
           { role: "system", content: SUPPLY_CHAIN_SUGGESTION_SYSTEM_PROMPT },
           ...messages
         ],
-        maxTokens: 4096,
+        maxOutputTokens: 4096,
         temperature: 0.7,
       })
 

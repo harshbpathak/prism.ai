@@ -128,11 +128,20 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ success: true, alertsGenerated: 0, message: "News evaluated; no direct threats matched critical nodes." });
 
-  } catch (error) {
+  } catch (error: any) {
+    const errMsg = error instanceof Error ? error.message : "Internal Error";
+    const isRateLimit = errMsg.includes('quota') || errMsg.includes('429') || errMsg.includes('RESOURCE_EXHAUSTED');
+    
+    if (isRateLimit) {
+      console.warn('[ALERT-AGENT] AI quota exceeded — skipping this scan cycle.');
+      // Return success:true with 0 alerts so the frontend doesn't show an error for background scans
+      return NextResponse.json({ success: true, alertsGenerated: 0, message: "Quota limit reached — scan skipped. Will retry next cycle." });
+    }
+
     console.error('Automated Alert Error:', error);
     return NextResponse.json({ 
       success: false, 
-      error: error instanceof Error ? error.message : "Internal Error" 
+      error: errMsg
     }, { status: 500 });
   }
 }

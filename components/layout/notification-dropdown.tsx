@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { motion, type Variants } from "framer-motion"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
@@ -279,6 +279,7 @@ export function NotificationDropdown() {
     const [unreadCount, setUnreadCount] = useState(0)
     const [user, setUser] = useState<Tables<'users'> | null>(null)
     const [isMarkingAll, setIsMarkingAll] = useState(false)
+    const locallyReadIds = useRef<Set<string>>(new Set())
 
     useEffect(() => {
         async function fetchUser() {
@@ -294,21 +295,29 @@ export function NotificationDropdown() {
         async function fetchNotifications() {
             if (!user?.id) return; // Additional null check for TypeScript
             const fetchedNotifications = await getNotifications(user.id)
-            setNotifications(fetchedNotifications)
-            const unread = fetchedNotifications.filter(n => !n.read_status).length
+            
+            // Merge locally-marked-read IDs
+            const merged = fetchedNotifications.map(n =>
+                locallyReadIds.current.has(n.notification_id)
+                    ? { ...n, read_status: true }
+                    : n
+            )
+            
+            setNotifications(merged)
+            const unread = merged.filter(n => !n.read_status).length
             setUnreadCount(unread)
         }
         fetchNotifications()
 
         const dbInterval = setInterval(fetchNotifications, 60000) // Refresh DB every minute
 
-        // Real-time news polling (every 5 seconds)
+        // Real-time news polling (every 2 minutes)
         let isPolling = false;
         const fetchLiveNews = async () => {
-            if (isPolling) return;
+            if (isPolling || !user?.id) return;
             isPolling = true;
             try {
-                const response = await fetch('/api/agent/news-polling')
+                const response = await fetch(`/api/agent/news-polling?userId=${user.id}`)
                 if (!response.ok) return;
 
                 const data = await response.json()
@@ -320,12 +329,17 @@ export function NotificationDropdown() {
                         
                         if (newUnique.length === 0) return prev; // No actual new items
 
-                        // Update unread count based on actual new unique items
-                        setUnreadCount(prevCount => prevCount + newUnique.length)
+                        // Mark any as read if they match our local set
+                        const processedNew = newUnique.map((n: Notification) => 
+                            locallyReadIds.current.has(n.notification_id) ? { ...n, read_status: true } : n
+                        )
 
-                        // Keep DB items sorted by date, but prepend the absolute newest live ones
+                        // Update unread count based on actual new unique items that aren't already locally marked as read
+                        const unreadNew = processedNew.filter((n: Notification) => !n.read_status).length
+                        setUnreadCount(prevCount => prevCount + unreadNew)
+
                         // Combine, sort by date descending
-                        const combined = [...newUnique, ...prev].sort((a, b) => {
+                        const combined = [...processedNew, ...prev].sort((a, b) => {
                             const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
                             const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
                             return dateB - dateA;
@@ -352,23 +366,31 @@ export function NotificationDropdown() {
     }, [user])
 
     const handleMarkAsRead = async (notificationId: string) => {
+        // Optimistically update
+        locallyReadIds.current.add(notificationId)
+        setNotifications(prev => 
+            prev.map(n => 
+                n.notification_id === notificationId 
+                    ? { ...n, read_status: true }
+                    : n
+            )
+        )
+        setUnreadCount(prev => Math.max(0, prev - 1))
+
         try {
             await markNotificationAsRead(notificationId)
-            
-            // Update local state
+            toast.success('Notification marked as read')
+        } catch (error) {
+            // Revert
+            locallyReadIds.current.delete(notificationId)
             setNotifications(prev => 
                 prev.map(n => 
                     n.notification_id === notificationId 
-                        ? { ...n, read_status: true }
+                        ? { ...n, read_status: false }
                         : n
                 )
             )
-            
-            // Update unread count
-            setUnreadCount(prev => Math.max(0, prev - 1))
-            
-            toast.success('Notification marked as read')
-        } catch (error) {
+            setUnreadCount(prev => prev + 1)
             console.error('Failed to mark notification as read:', error)
             toast.error('Failed to mark notification as read')
         }
@@ -378,19 +400,23 @@ export function NotificationDropdown() {
         if (!user?.id || isMarkingAll) return
         
         setIsMarkingAll(true)
+        
+        // Optimistically update
+        const currentNotifications = [...notifications]
+        const allIds = currentNotifications.map(n => n.notification_id)
+        allIds.forEach(id => locallyReadIds.current.add(id))
+        setNotifications(prev => prev.map(n => ({ ...n, read_status: true })))
+        setUnreadCount(0)
+
         try {
             await markAllNotificationsAsRead(user.id)
-            
-            // Update local state
-            setNotifications(prev => 
-                prev.map(n => ({ ...n, read_status: true }))
-            )
-            
-            // Reset unread count
-            setUnreadCount(0)
-            
             toast.success('All notifications marked as read')
         } catch (error) {
+            // Revert
+            allIds.forEach(id => locallyReadIds.current.delete(id))
+            setNotifications(currentNotifications)
+            const unread = currentNotifications.filter(n => !n.read_status).length
+            setUnreadCount(unread)
             console.error('Failed to mark all notifications as read:', error)
             toast.error('Failed to mark all notifications as read')
         } finally {

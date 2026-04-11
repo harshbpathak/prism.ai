@@ -27,35 +27,45 @@ export async function POST(request: NextRequest) {
     }
 
     // 2. Fetch Supply Chain Nodes (to map affected entities if needed)
-    const { data: nodes, error: nodeError } = await supabaseServer
+    const { data: nodes } = await supabaseServer
       .from('nodes')
       .select('*')
       .eq('supply_chain_id', supplyChainId);
 
-    if (nodeError || !nodes) {
-       return NextResponse.json({ error: "Supply chain nodes not found" }, { status: 404 });
+    // Also verify the supply chain itself exists
+    const { data: supplyChain } = await supabaseServer
+      .from('supply_chains')
+      .select('supply_chain_id, name')
+      .eq('supply_chain_id', supplyChainId)
+      .single();
+
+    if (!supplyChain) {
+       return NextResponse.json({ error: "Supply chain not found" }, { status: 404 });
     }
+
+    const allNodes = nodes || [];
 
     // Extract citations to figure out what nodes might be affected
     const citations = notification.citations as any || {};
     
     // Map affected entities from the citations to an actual existing node ID in this supply chain
     let affectedNodes: string[] = [];
-    if (citations.affectedEntities && Array.isArray(citations.affectedEntities)) {
+    if (citations.affectedEntities && Array.isArray(citations.affectedEntities) && allNodes.length > 0) {
         // Try mapping by name or location
-        affectedNodes = nodes
-           .filter(node => citations.affectedEntities.some((entity: string) => 
+        affectedNodes = allNodes
+           .filter((node: any) => citations.affectedEntities.some((entity: string) => 
                node.name?.toLowerCase().includes(entity.toLowerCase()) || 
                node.address?.toLowerCase().includes(entity.toLowerCase())
            ))
-           .map(node => node.node_id);
+           .map((node: any) => node.node_id);
     } 
     
-    // If no nodes matched explicitly, provide the highest risk node as a simulation baseline
-    if (affectedNodes.length === 0) {
-        const topNode = [...nodes].sort((a, b) => (b.risk_level || 0) - (a.risk_level || 0))[0];
+    // If no nodes matched explicitly, use the highest risk node as a simulation baseline
+    if (affectedNodes.length === 0 && allNodes.length > 0) {
+        const topNode = [...allNodes].sort((a: any, b: any) => (b.risk_level || 0) - (a.risk_level || 0))[0];
         if (topNode) affectedNodes.push(topNode.node_id);
     }
+    // If supply chain has no nodes yet, we still create the simulation — AI analysis works without nodes
     
     // 3. Create a unique simulation record for this news event against this specific supply chain
     const simulationName = `News Sim: ${notification.title?.substring(0, 30)}...`;

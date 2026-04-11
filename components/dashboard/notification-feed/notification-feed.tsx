@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { AlertTriangle, CheckCircle, Info, BellOff, X, ArrowRight, Plus, Route, MapPin, Package, Factory } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { motion, AnimatePresence } from "framer-motion"
@@ -38,6 +38,9 @@ export function NotificationFeed() {
   const [newsAnalysisResults, setNewsAnalysisResults] = useState<any[]>([])
   const { toast } = useToast()
 
+  // Client-side set of IDs the user has marked read — survives re-fetches from the polling interval
+  const locallyReadIds = useRef<Set<string>>(new Set())
+
   // Fetch user data
   useEffect(() => {
     async function fetchUser() {
@@ -64,7 +67,13 @@ export function NotificationFeed() {
       try {
         setLoading(true)
         const fetchedNotifications = await getNotifications(user.id)
-        setNotifications(fetchedNotifications)
+        // Merge locally-marked-read IDs so polling never reverts optimistic state
+        const merged = fetchedNotifications.map(n =>
+          locallyReadIds.current.has(n.notification_id)
+            ? { ...n, read_status: true }
+            : n
+        )
+        setNotifications(merged)
       } catch (error) {
         console.error('Error fetching notifications:', error)
         toast({
@@ -80,10 +89,10 @@ export function NotificationFeed() {
     // Real-time news polling 
     let isNewsPolling = false;
     const fetchLiveNews = async () => {
-        if (isNewsPolling) return;
+        if (isNewsPolling || !user?.id) return;
         isNewsPolling = true;
         try {
-            const response = await fetch('/api/agent/news-polling')
+            const response = await fetch(`/api/agent/news-polling?userId=${user.id}`)
             if (!response.ok) return;
 
             const data = await response.json()
@@ -152,17 +161,19 @@ export function NotificationFeed() {
   }, [user, supplyChains, toast])
 
   const handleMarkAsRead = async (id: string) => {
+    // Optimistically mark read in UI immediately
+    locallyReadIds.current.add(id)
+    setNotifications(prev => prev.map(n =>
+      n.notification_id === id ? { ...n, read_status: true } : n
+    ))
     try {
       await markNotificationAsRead(id)
-      // Update local state
-      setNotifications(prev => prev.map(n => 
-        n.notification_id === id ? { ...n, read_status: true } : n
-      ))
-      toast({
-        title: "Marked as read",
-        description: "Notification marked as read successfully",
-      })
     } catch (error) {
+      // Revert on failure
+      locallyReadIds.current.delete(id)
+      setNotifications(prev => prev.map(n =>
+        n.notification_id === id ? { ...n, read_status: false } : n
+      ))
       console.error('Error marking notification as read:', error)
       toast({
         title: "Error",
@@ -174,15 +185,20 @@ export function NotificationFeed() {
 
   const handleMarkAllAsRead = async () => {
     if (!user?.id) return
+    // Optimistically mark all read in UI immediately
+    const allIds = notifications.map(n => n.notification_id)
+    allIds.forEach(id => locallyReadIds.current.add(id))
+    setNotifications(prev => prev.map(n => ({ ...n, read_status: true })))
     try {
       await markAllNotificationsAsRead(user.id)
-      // Update local state
-      setNotifications(prev => prev.map(n => ({ ...n, read_status: true })))
       toast({
         title: "Success",
         description: "All notifications marked as read",
       })
     } catch (error) {
+      // Revert on failure
+      allIds.forEach(id => locallyReadIds.current.delete(id))
+      setNotifications(prev => prev.map(n => ({ ...n, read_status: false })))
       console.error('Error marking all notifications as read:', error)
       toast({
         title: "Error",
@@ -207,24 +223,47 @@ export function NotificationFeed() {
     try {
         const results = [];
         
-        // Let's run it against all user supply chains, or just the first 3 if there are many to avoid ratelimits
+        // Run against first 3 supply chains to avoid rate limits
         const targets = supplyChains.slice(0, 3);
         
         for (const chain of targets) {
-            // 1. Create the simulation scenario from the news
-            const simRes = await fetch('/api/agent/news-simulation', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
-                    notificationId: selectedNotification.notification_id,
-                    supplyChainId: chain.supply_chain_id,
-                    notification: selectedNotification
-                })
-            });
-            const simData = await simRes.json();
-            
-            if (simData.success && simData.simulation_id) {
-                // 2. Run the impact agent against this new simulation (force refresh to get fresh AI)
+            try {
+                console.log(`[IMPACT] Creating simulation for SC: ${chain.supply_chain_id}`);
+                
+                // 1. Create the simulation scenario from the news
+                const simRes = await fetch('/api/agent/news-simulation', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        notificationId: selectedNotification.notification_id,
+                        supplyChainId: chain.supply_chain_id,
+                        notification: selectedNotification
+                    })
+                });
+
+                if (!simRes.ok) {
+                    const errData = await simRes.json().catch(() => ({}));
+                    console.error(`[IMPACT] Simulation creation failed for ${chain.supply_chain_id}:`, errData);
+                    results.push({
+                        supplyChainName: chain.name || 'Supply Chain',
+                        error: errData.error || `Simulation failed (HTTP ${simRes.status})`
+                    });
+                    continue;
+                }
+
+                const simData = await simRes.json();
+                console.log(`[IMPACT] Simulation created:`, simData);
+                
+                if (!simData.success || !simData.simulation_id) {
+                    results.push({
+                        supplyChainName: chain.name || 'Supply Chain',
+                        error: simData.error || "Failed to create simulation from news"
+                    });
+                    continue;
+                }
+
+                // 2. Run the impact agent against this new simulation
+                console.log(`[IMPACT] Running impact analysis for simulation: ${simData.simulation_id}`);
                 const impactRes = await fetch('/api/agent/impact', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -234,9 +273,19 @@ export function NotificationFeed() {
                         forceRefresh: true
                     })
                 });
+
+                if (!impactRes.ok) {
+                    const errData = await impactRes.json().catch(() => ({}));
+                    console.error(`[IMPACT] Impact analysis failed:`, errData);
+                    results.push({
+                        supplyChainName: chain.name || 'Supply Chain',
+                        simulation_id: simData.simulation_id,
+                        error: errData.error || `Impact analysis failed (HTTP ${impactRes.status})`
+                    });
+                    continue;
+                }
+
                 const impactData = await impactRes.json();
-                
-                // The impact agent returns results in impactData.data
                 const analysis = impactData.data;
 
                 results.push({
@@ -248,10 +297,12 @@ export function NotificationFeed() {
                     keyFindings: analysis?.keyFindings || [],
                     error: impactData.error || null
                 });
-            } else {
+
+            } catch (chainErr: any) {
+                console.error(`[IMPACT] Chain error for ${chain.supply_chain_id}:`, chainErr);
                 results.push({
                     supplyChainName: chain.name || 'Supply Chain',
-                    error: simData.error || "Failed to scenariofy news"
+                    error: chainErr.message || 'Unexpected error during analysis'
                 });
             }
         }

@@ -1,80 +1,121 @@
 import { tavily } from '@tavily/core';
 import { NextRequest, NextResponse } from 'next/server';
+import { supabaseServer } from '@/lib/supabase/server';
 
 const tavilyClient = tavily({
   apiKey: process.env.TAVILY_API_KEY
 });
 
-// We want to fetch very recent news to simulate an active feed.
-// Keeping track of a simulated timeline on the server could get complex,
-// so we'll just fetch the absolute latest and let the frontend manage duplicates via URL matching.
-// Basic in-memory cache to prevent exhausting Tavily quota
-let cachedNews: any[] = [];
+// In-memory rate-limit guard — avoid hammering Tavily on every request
 let lastFetchTime = 0;
-const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+const FETCH_COOLDOWN = 5 * 60 * 1000; // 5 minutes
 
 export async function GET(req: NextRequest) {
   try {
+    const { searchParams } = new URL(req.url);
+    const userId = searchParams.get('userId');
+
+    if (!userId) {
+      return NextResponse.json({ error: 'userId is required' }, { status: 400 });
+    }
+
     const now = Date.now();
-    
-    // Return cached results if they're still fresh
-    if (cachedNews.length > 0 && (now - lastFetchTime) < CACHE_TTL) {
-      console.log('📡 Returning cached live news (TTL: 5m)');
-      return NextResponse.json({ notifications: cachedNews, cached: true });
-    }
 
-    console.log('🔍 Fetching fresh news from Tavily...');
-    const searchResult = await tavilyClient.search('latest world news and supply chain disruptions', {
-      topic: 'news',
-      days: 1, // Get news from the last day 
-      maxResults: 5,
-    });
+    // Only call Tavily if cooldown has expired
+    if (now - lastFetchTime > FETCH_COOLDOWN) {
+      console.log('🔍 Fetching fresh news from Tavily...');
 
-    if (!searchResult.results || searchResult.results.length === 0) {
-      return NextResponse.json({ notifications: cachedNews }); // Return last known good if empty
-    }
+      const searchResult = await tavilyClient.search(
+        'latest supply chain disruption logistics trade news',
+        { topic: 'news', days: 2, maxResults: 10 }
+      );
 
-    // Format the search results into our expected Notification schema structure
-    const notifications = searchResult.results.map((result) => {
-        const pseudoId = Buffer.from(result.url).toString('base64').substring(0, 30);
-        
-        return {
-          notification_id: `live-news-${pseudoId}`,
-          user_id: "live-feed",
-          title: result.title,
-          message: result.content.substring(0, 300) + (result.content.length > 300 ? '...' : ''),
-          notification_type: 'live_news_alert',
-          severity: 'HIGH',
-          read_status: false,
-          created_at: result.publishedDate || new Date().toISOString(),
-          citations: {
-            category: 'Live News',
-            sources: [
-              {
-                title: result.title.substring(0, 30) + '...',
-                url: result.url,
-                publishedAt: result.publishedDate,
-                credibility: 0.9,
-              }
-            ],
-            affectedEntities: ['Global Supply Chain']
+      if (searchResult.results && searchResult.results.length > 0) {
+        // Fetch all existing live_news URLs for this user to dedup
+        const { data: existingNews } = await supabaseServer
+          .from('notifications')
+          .select('citations')
+          .eq('user_id', userId)
+          .eq('notification_type', 'live_news_alert');
+
+        const existingUrls = new Set(
+          (existingNews || [])
+            .map((n: any) => n.citations?.sources?.[0]?.url)
+            .filter(Boolean)
+        );
+
+        const newArticles = searchResult.results.filter(
+          (r) => !existingUrls.has(r.url)
+        );
+
+        if (newArticles.length > 0) {
+          const inserts = newArticles.map((result) => ({
+            user_id: userId,
+            title: result.title,
+            message: result.content
+              ? result.content.substring(0, 500) + (result.content.length > 500 ? '...' : '')
+              : 'No content available.',
+            notification_type: 'live_news_alert',
+            severity: 'MEDIUM' as const,
+            read_status: false,
+            created_at: result.publishedDate
+              ? new Date(result.publishedDate).toISOString()
+              : new Date().toISOString(),
+            citations: {
+              category: 'Live News',
+              sources: [
+                {
+                  title: result.title,
+                  url: result.url,
+                  publishedAt: result.publishedDate || new Date().toISOString(),
+                  credibility: 0.85,
+                },
+              ],
+              affectedEntities: ['Global Supply Chain'],
+            },
+          }));
+
+          const { error: insertError } = await supabaseServer
+            .from('notifications')
+            .insert(inserts);
+
+          if (insertError) {
+            console.error('⚠️ Failed to persist news to notifications:', insertError.message);
+          } else {
+            console.log(`✅ Saved ${inserts.length} new news articles to Supabase.`);
           }
+        } else {
+          console.log('📡 No new articles to save — all already persisted.');
         }
-    });
 
-    // Update cache
-    cachedNews = notifications;
-    lastFetchTime = now;
+        lastFetchTime = now;
+      }
+    } else {
+      console.log('📡 Tavily cooldown active — serving news from Supabase only.');
+    }
 
-    return NextResponse.json({ notifications });
+    // Always return the 5 most recent live_news_alert notifications from DB
+    const { data: latestNews, error: fetchError } = await supabaseServer
+      .from('notifications')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('notification_type', 'live_news_alert')
+      .order('created_at', { ascending: false })
+      .limit(5);
+
+    if (fetchError) {
+      console.error('⚠️ Failed to fetch news from Supabase:', fetchError.message);
+      return NextResponse.json({ notifications: [] });
+    }
+
+    return NextResponse.json({ notifications: latestNews || [] });
+
   } catch (error: any) {
-    console.error('⚠️ News API polling failure (Graceful Fallback):', error?.message);
-    
-    // If it's a rate limit or any Tavily error, return cached or empty instead of 500
-    return NextResponse.json({ 
-      notifications: cachedNews, 
-      error: 'Rate limit or service error',
-      fallback: true 
+    console.error('⚠️ News polling failure:', error?.message);
+    return NextResponse.json({
+      notifications: [],
+      error: error?.message || 'Internal error',
+      fallback: true
     });
   }
-} 
+}

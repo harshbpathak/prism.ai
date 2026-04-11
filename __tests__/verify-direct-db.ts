@@ -1,7 +1,7 @@
-
 import { createClient } from '@supabase/supabase-js';
 import * as dotenv from 'dotenv';
 import { resolve } from 'path';
+import { randomUUID } from 'crypto';
 
 dotenv.config({ path: resolve(process.cwd(), '.env.local') });
 
@@ -10,7 +10,7 @@ const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const supabase = createClient(supabaseUrl!, supabaseServiceKey!);
 
 async function verifyDirectSave() {
-  const supplyChainId = 'test-sc-direct-' + Date.now();
+  const supplyChainId = randomUUID();
   console.log('Verifying direct DB insertion with ID:', supplyChainId);
 
   try {
@@ -27,7 +27,7 @@ async function verifyDirectSave() {
     console.log(' Supply Chain inserted');
 
     // 2. Insert Node
-    const nodeId = 'test-node-' + Date.now();
+    const nodeId = randomUUID();
     const { error: nErr } = await supabase.from('nodes').insert({
       node_id: nodeId,
       supply_chain_id: supplyChainId,
@@ -44,7 +44,7 @@ async function verifyDirectSave() {
 
     // 3. Insert Edge
     const { error: eErr } = await supabase.from('edges').insert({
-      edge_id: 'test-edge-' + Date.now(),
+      edge_id: randomUUID(),
       supply_chain_id: supplyChainId,
       from_node_id: nodeId,
       to_node_id: nodeId, // Self-loop for test
@@ -68,7 +68,7 @@ async function verifyDirectSave() {
       console.error('VERIFICATION FAILED: Counts mismatch');
     }
   } catch (err: any) {
-    console.error('Unexpected error:', err.message);
+    console.error('Unexpected error:', err.message || err);
   }
 }
 

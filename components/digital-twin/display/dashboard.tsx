@@ -49,6 +49,7 @@ export default function DigitalTwinDashboard() {
   const [deleting, setDeleting] = useState(false);
   const [dataFetched, setDataFetched] = useState(false);
   const [view, setView] = useQueryState('view', parseAsString);
+  const [, setTwinId] = useQueryState('twinId', parseAsString);
   const { userData, userLoading } = useUser();
 
   const fetchSupplyChains = async () => {
@@ -305,7 +306,7 @@ export default function DigitalTwinDashboard() {
                     <button
                       className="flex items-start gap-3 text-left min-w-0"
                       onClick={() => {
-                        setView(`view:${chain.supply_chain_id}`);
+                        setTwinId(chain.supply_chain_id);
                       }}
                     >
                       <div className="w-7 h-7 border border-slate-200 dark:border-slate-800 flex items-center justify-center shrink-0 text-[10px] font-bold text-slate-500 mt-0.5 uppercase">

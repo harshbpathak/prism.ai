@@ -13,6 +13,7 @@ import { FORM_STEPS } from "@/constants/supply-chain-form";
 import { 
     formSchema, 
     FormData,
+    STEP_SCHEMAS,
     SupplyChainInfoStep,
     LogisticsStep,
     RiskFactorsStep,
@@ -45,13 +46,13 @@ export default function CreationForm({ onSuccess, onCancel }: CreationFormProps)
   const [formParam, setFormParam] = useQueryState('form', parseAsString);
   
   // Determine initial default values
-  const defaultValuesFromParams: FormData = {
+  const defaultValuesFromParams: Partial<FormData> = {
     productCharacteristics: productCharacteristicsParam || [],
     operationsLocation: operationsLocationParam || [],
     shippingMethods: shippingMethodsParam || [],
     risks: risksParam || [],
     annualVolumeType: (annualVolumeTypeParam as "units" | "currency") || "units",
-    annualVolumeValue: annualVolumeValueParam || 0,
+    annualVolumeValue: annualVolumeValueParam ?? undefined,
     industry: industryParam || "",
     customIndustry: customIndustryParam || "",
     supplierTiers: supplierTiersParam || "",
@@ -59,13 +60,13 @@ export default function CreationForm({ onSuccess, onCancel }: CreationFormProps)
     currency: currencyParam || "",
   };
 
-  let mergedDefaultValues: FormData = defaultValuesFromParams;
+  let mergedDefaultValues: Partial<FormData> = defaultValuesFromParams;
   if (formParam) {
     try {
       mergedDefaultValues = {
         ...mergedDefaultValues,
         ...decompressArchData(formParam) as Partial<FormData>,
-      } as FormData;
+      };
     } catch (error) {
       console.error('Failed to decompress form data from URL:', error);
     }
@@ -79,11 +80,30 @@ export default function CreationForm({ onSuccess, onCancel }: CreationFormProps)
   const watchOperationsLocation = form.watch("operationsLocation");
 
   const handleNext = async () => {
-    const fields = steps[step].fields;
-    const output = await form.trigger(fields as any, { shouldFocus: true });
+    const currentValues = form.getValues();
+    const stepSchema = STEP_SCHEMAS[step] as any;
 
-    if (!output) return;
+    // Use safeParse — never throws, so Sentry never captures a false-positive ZodError.
+    // form.trigger() runs the FULL zodResolver schema (including fields from future steps)
+    // which causes ZodErrors to bubble up to Sentry even though they're caught internally.
+    const result = stepSchema.safeParse(currentValues);
 
+    if (!result.success) {
+      // Manually surface errors on the specific fields that failed,
+      // so inline validation messages appear just like normal.
+      result.error.errors.forEach((err: any) => {
+        const fieldName = err.path.join('.') as keyof FormData;
+        form.setError(fieldName, { type: 'manual', message: err.message });
+      });
+      // Focus the first invalid field
+      const firstErrorField = result.error.errors[0]?.path[0] as keyof FormData | undefined;
+      if (firstErrorField) {
+        form.setFocus(firstErrorField);
+      }
+      return;
+    }
+
+    // Step 0 special case: domestic operations requires a country
     if (step === 0 && watchOperationsLocation.includes('domestic') && !form.getValues("country")) {
       setShowCountryDialog(true);
       return;
@@ -97,15 +117,17 @@ export default function CreationForm({ onSuccess, onCancel }: CreationFormProps)
   };
 
   const handleCountryNext = async () => {
-    const countryValid = await form.trigger(["country"], { shouldFocus: true });
-    
-    if (countryValid) {
-      setShowCountryDialog(false);
-      if (step < steps.length - 1) {
-        setStep(step + 1);
-      } else {
-        form.handleSubmit(onSubmit)();
-      }
+    const country = form.getValues("country");
+    if (!country || country.length === 0) {
+      form.setError("country", { type: 'manual', message: "Please select a country for domestic operations" });
+      return;
+    }
+    form.clearErrors("country");
+    setShowCountryDialog(false);
+    if (step < steps.length - 1) {
+      setStep(step + 1);
+    } else {
+      form.handleSubmit(onSubmit)();
     }
   };
 

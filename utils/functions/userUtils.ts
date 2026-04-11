@@ -19,9 +19,28 @@ const getUserData = async () => {
       return userdetails.data[0]
     }
 
-    // No row in users table yet — return a minimal object from auth so
-    // components that gate on userData?.id still function correctly.
-    console.log("No user data found in 'users' table, using auth session fallback.")
+    // No row in users table yet — create one so foreign keys don't fail!
+    console.log("No user data found in 'users' table, creating record now.")
+    
+    try {
+      const { data: newUserData, error: insertError } = await supabaseClient
+        .from('users')
+        .insert({
+          id: authUser.id,
+          email: authUser.email ?? 'unknown@example.com',
+        })
+        .select()
+        .single();
+        
+      if (!insertError && newUserData) {
+        return newUserData;
+      } else {
+        console.error("Failed to insert new user:", insertError);
+      }
+    } catch (insertErr) {
+      console.error("Exception while inserting new user:", insertErr);
+    }
+
     return {
       id: authUser.id,
       email: authUser.email ?? null,

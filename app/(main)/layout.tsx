@@ -56,7 +56,8 @@ export default function MainLayout({
         const skipProfileCheck = pathname.includes('/dashboard') || 
                                 pathname.includes('/digital-twin') ||
                                 pathname.includes('/simulation') ||
-                                pathname.includes('/orchestrator')
+                                pathname.includes('/orchestrator') ||
+                                pathname.includes('/risk-prediction')
         
         if (userData && !skipProfileCheck && (
           !userData.organisation_name || userData.organisation_name.trim() === ''

@@ -15,6 +15,7 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import DigitalTwinEditSkeleton from '@/components/digital-twin/display/DigitalTwinEditSkeleton';
+import { supabaseClient } from '@/lib/supabase/client';
 
 export default function DigitalTwinClientPage() {
   const [twinId, setTwinId] = useQueryState('twinId', parseAsString);
@@ -71,7 +72,7 @@ export default function DigitalTwinClientPage() {
           try {
             const formDataFromUrl = decompressArchData(formParam);
 
-            console.log('🔄 Recreating twin from COMPRESSED URL parameters...');
+            console.log('Recreating twin from COMPRESSED URL parameters...');
 
             // Select template based on decompressed form data
             const { nodes, edges } = selectTemplate(formDataFromUrl);
@@ -85,7 +86,7 @@ export default function DigitalTwinClientPage() {
               createdAt: new Date().toISOString(),
             };
 
-            console.log('✅ Twin recreated from COMPRESSED URL:', twinData);
+            console.log('Twin recreated from COMPRESSED URL:', twinData);
             setActiveTwinData(twinData);
             setIsLoading(false);
             return;
@@ -93,7 +94,7 @@ export default function DigitalTwinClientPage() {
             console.error('Error recreating twin from compressed form param:', error);
           }
         } else if (hasFormDataInUrl()) {
-          console.log('🔄 Recreating twin from URL parameters...');
+          console.log('Recreating twin from URL parameters...');
           
           const formDataFromUrl = {
             industry: industryParam!,
@@ -122,7 +123,7 @@ export default function DigitalTwinClientPage() {
               createdAt: new Date().toISOString()
             };
 
-            console.log('✅ Twin recreated from URL parameters:', twinData);
+            console.log('Twin recreated from URL parameters:', twinData);
             setActiveTwinData(twinData);
             setIsLoading(false);
             return;
@@ -131,37 +132,102 @@ export default function DigitalTwinClientPage() {
           }
         }
 
-        // Fallback to localStorage
-        const data = localStorage.getItem(`supplyChain-${twinId}`);
-        if (data) {
+        // Fallback 1: localStorage (for locally-created twins)
+        const localData = localStorage.getItem(`supplyChain-${twinId}`);
+        if (localData) {
           try {
-            const parsedData = JSON.parse(data);
+            const parsedData = JSON.parse(localData);
             setActiveTwinData(parsedData);
+            setIsLoading(false);
+            return;
           } catch (error) {
-            console.error('Error parsing twin data:', error);
-            setActiveTwinData(null);
+            console.error('Error parsing localStorage twin data:', error);
           }
-        } else {
-          console.error('No localStorage data found for twin:', twinId, 'Available keys:', Object.keys(localStorage));
-          
-          // Check if this might be a newly created twin that hasn't been properly saved yet
-          const allStorageKeys = Object.keys(localStorage);
-          const possibleTwinKey = allStorageKeys.find(key => key.startsWith('supplyChain-'));
-          
-          if (possibleTwinKey) {
-            try {
-              console.log('Found potential twin data in:', possibleTwinKey, 'trying to use it instead');
-              const alternativeData = JSON.parse(localStorage.getItem(possibleTwinKey) || '{}');
-              setActiveTwinData(alternativeData);
+        }
+
+        // Fallback 2: Fetch directly from Supabase DB (for DB-persisted twins)
+        const fetchFromDb = async () => {
+          console.log('💾 No localStorage found — fetching supply chain from Supabase:', twinId);
+          try {
+            const [{ data: scData, error: scErr }, { data: nodes }, { data: edges }] = await Promise.all([
+              supabaseClient.from('supply_chains').select('*').eq('supply_chain_id', twinId).single(),
+              supabaseClient.from('nodes').select('*').eq('supply_chain_id', twinId),
+              supabaseClient.from('edges').select('*').eq('supply_chain_id', twinId),
+            ]);
+
+            if (scErr || !scData) {
+              console.error('Supply chain not found in DB:', scErr?.message);
+              setActiveTwinData(null);
               setIsLoading(false);
               return;
-            } catch (err) {
-              console.error('Error parsing alternative twin data:', err);
             }
+
+            const formData = scData.form_data as any || {};
+            const org = scData.organisation as any || {};
+
+            // Build canvas-compatible node/edge format from DB rows
+            const canvasNodes = (nodes || []).map((n: any, idx: number) => ({
+              id: n.node_id,
+              type: 'supply-chain-node',
+              position: n.data?.position || { x: 100 + (idx % 4) * 280, y: 100 + Math.floor(idx / 4) * 200 },
+              data: {
+                label: n.name,
+                nodeType: n.type,
+                description: n.description,
+                location: n.address,
+                lat: n.location_lat,
+                lng: n.location_lng,
+                capacity: n.capacity,
+                riskLevel: n.risk_level,
+                ...n.data,
+              },
+            }));
+
+            const canvasEdges = (edges || []).map((e: any) => ({
+              id: e.edge_id,
+              source: e.from_node_id,
+              target: e.to_node_id,
+              type: e.type || 'smoothstep',
+              label: e.data?.label || '',
+              data: e.data || {},
+            }));
+
+            const twinData = {
+              // Form-compatible fields
+              industry: formData.industry || org.industry || 'General',
+              customIndustry: formData.customIndustry || '',
+              productCharacteristics: formData.productCharacteristics || [],
+              supplierTiers: formData.supplierTiers || '1',
+              operationsLocation: formData.operationsLocation || [org.location || 'Global'],
+              country: formData.country || 'India',
+              currency: formData.currency || 'USD',
+              shippingMethods: formData.shippingMethods || [],
+              annualVolumeType: formData.annualVolumeType || 'units',
+              annualVolumeValue: formData.annualVolumeValue || 0,
+              risks: formData.risks || [],
+              // Supply chain metadata
+              name: scData.name,
+              description: scData.description,
+              supply_chain_id: scData.supply_chain_id,
+              // Canvas data
+              nodes: canvasNodes,
+              edges: canvasEdges,
+              // DB source flag
+              fromDatabase: true,
+              createdAt: scData.timestamp || new Date().toISOString(),
+            };
+
+            console.log(`✅ Loaded supply chain "${scData.name}" from DB: ${canvasNodes.length} nodes, ${canvasEdges.length} edges`);
+            setActiveTwinData(twinData);
+            setIsLoading(false);
+          } catch (dbErr: any) {
+            console.error('Error fetching supply chain from DB:', dbErr.message);
+            setActiveTwinData(null);
+            setIsLoading(false);
           }
-          
-          setActiveTwinData(null);
-        }
+        };
+
+        fetchFromDb();
       } else {
         // When arch param exists, set minimal twin data to indicate we have a twin
         // but let the canvas handle the actual node/edge state from the URL
@@ -179,8 +245,8 @@ export default function DigitalTwinClientPage() {
   };
 
   const handleCreationSuccess = (data: any) => {
-    console.log('🚀 Supply chain created with form data:', data);
-    console.log('📋 Form Data Details:', {
+    console.log('Supply chain created with form data:', data);
+    console.log(' Form Data Details:', {
       industry: data.industry,
       customIndustry: data.customIndustry,
       productCharacteristics: data.productCharacteristics,
@@ -198,7 +264,7 @@ export default function DigitalTwinClientPage() {
     const { nodes, edges } = selectTemplate(data);
     const templateInfo = getTemplateInfo(data);
 
-    console.log(`🎯 Selected template: ${templateInfo.templateName} - ${templateInfo.reason}`);
+    console.log(`Selected template: ${templateInfo.templateName} - ${templateInfo.reason}`);
 
     // Create dummy twin ID with a strict UUID so Supabase doesn't reject it
     const twinId = crypto.randomUUID();
@@ -213,12 +279,12 @@ export default function DigitalTwinClientPage() {
     };
     
     
-    console.log('✅ Digital twin created with dummy ID:', twinId);
-    console.log('💾 Template data stored temporarily:', twinData);
+    console.log(' Digital twin created with dummy ID:', twinId);
+    console.log(' Template data stored temporarily:', twinData);
     
     // Store the data in localStorage so it can be retrieved when loading the canvas
     localStorage.setItem(`supplyChain-${twinId}`, JSON.stringify(twinData));
-    console.log('💾 Template data stored in localStorage with key:', `supplyChain-${twinId}`);
+    console.log('Template data stored in localStorage with key:', `supplyChain-${twinId}`);
     
     // Close the dialog
     setView(null, { scroll: false });

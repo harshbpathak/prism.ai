@@ -53,9 +53,19 @@ Sentry.init({
 
   // Add context for better debugging
   beforeSend(event, hint) {
-    // Add additional context
+    const error = hint.originalException;
+
+    // ZodErrors are expected form validation errors handled internally by react-hook-form.
+    // They are NOT application crashes. Suppressing them prevents false-positive noise.
+    if (
+      error instanceof Error &&
+      (error.name === 'ZodError' || error.constructor?.name === 'ZodError')
+    ) {
+      return null; // Drop this event — do not send to Sentry
+    }
+
+    // Log in dev for debugging non-ZodErrors only
     if (event.exception && process.env.NODE_ENV === 'development') {
-      const error = hint.originalException;
       console.log('Sentry captured error:', error);
     }
     return event;

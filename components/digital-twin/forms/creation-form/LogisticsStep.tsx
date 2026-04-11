@@ -130,7 +130,7 @@ export const LogisticsStep = () => {
                           onChange={(e) => {
                             const value = e.target.value;
                             volumeField.onChange(
-                              value === "" ? 0 : parseInt(value, 10) || 0
+                              value === "" ? undefined : parseInt(value, 10) || undefined
                             );
                           }}
                           className="h-10 shadow-sm border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 hover:border-slate-400 dark:hover:border-slate-500 transition-colors focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
