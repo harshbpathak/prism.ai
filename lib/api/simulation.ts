@@ -1,6 +1,13 @@
 import { supabaseClient } from "@/lib/supabase/client"
 import type { Simulation, ImpactResult, Strategy } from "@/lib/types/database"
-import { createHash } from 'crypto'
+// Simple browser-compatible string hasher
+function simpleHash(str: string): string {
+  let hash = 5381;
+  for (let i = 0; i < str.length; i++) {
+    hash = (hash * 33) ^ str.charCodeAt(i);
+  }
+  return (hash >>> 0).toString(16);
+}
 
 // Generate a hash for scenario parameters to identify duplicate scenarios
 function generateScenarioHash(scenarioData: any, supplyChainId: string): string {
@@ -21,7 +28,7 @@ function generateScenarioHash(scenarioData: any, supplyChainId: string): string 
   }
   
   const hashString = JSON.stringify(hashInput, Object.keys(hashInput).sort())
-  return createHash('sha256').update(hashString).digest('hex').substring(0, 16)
+  return simpleHash(hashString)
 }
 
 // Simulation CRUD operations

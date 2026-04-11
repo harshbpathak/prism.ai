@@ -524,22 +524,23 @@ export default function MitigationStrategyPage() {
     }
   }
 
-  // Use API data if available, otherwise fall back to defaults
-  const currentStrategies = strategyData || {
-    immediate: DEFAULT_MITIGATION_STRATEGIES.immediate,
-    shortTerm: DEFAULT_MITIGATION_STRATEGIES.shortTerm,
-    longTerm: DEFAULT_MITIGATION_STRATEGIES.longTerm,
-    riskMitigationMetrics: DEFAULT_RISK_MITIGATION_METRICS,
-    keyInsights: [],
-    marketIntelligence: [],
-    bestPractices: [],
-    contingencyPlans: []
+  // Use API data if available, otherwise fall back to defaults safely
+  const currentStrategies = {
+    immediate: strategyData?.immediate || DEFAULT_MITIGATION_STRATEGIES?.immediate || [],
+    shortTerm: strategyData?.shortTerm || DEFAULT_MITIGATION_STRATEGIES?.shortTerm || [],
+    longTerm: strategyData?.longTerm || DEFAULT_MITIGATION_STRATEGIES?.longTerm || [],
+    riskMitigationMetrics: strategyData?.riskMitigationMetrics || DEFAULT_RISK_MITIGATION_METRICS || { currentRisk: 0, targetRisk: 0, expectedROI: "0x", riskReduction: "0%" },
+    keyInsights: strategyData?.keyInsights || [],
+    marketIntelligence: strategyData?.marketIntelligence || [],
+    bestPractices: strategyData?.bestPractices || [],
+    contingencyPlans: strategyData?.contingencyPlans || []
   }
 
   // Calculate selected strategies summary for finalize panel (memoized to prevent unnecessary recalculations)
   const strategySummary = useMemo((): SelectedStrategySummary => {
     // Convert all strategies to API format first
     const convertToApiFormat = (strategies: (ApiMitigationStrategy | MitigationStrategy)[]): ApiMitigationStrategy[] => {
+      if (!Array.isArray(strategies)) return []
       return strategies.map(strategy => {
         // Check if it's already in API format
         if ('feasibility' in strategy && 'dependencies' in strategy) {
@@ -594,7 +595,7 @@ export default function MitigationStrategyPage() {
       shortTerm: shortTermApi,
       longTerm: longTermApi,
       totalCost: `$${totalCostValue.toFixed(1)}M`,
-      totalImpact: `${Math.round(totalImpactValue / allStrategies.length)}%`,
+      totalImpact: `${allStrategies.length > 0 ? Math.round(totalImpactValue / allStrategies.length) : 0}%`,
       timelineSpan: "0-90 days",
       riskReduction: currentStrategies.riskMitigationMetrics.riskReduction
     }
@@ -948,10 +949,10 @@ export default function MitigationStrategyPage() {
         </Tabs>
 
         {/* Additional Insights Section - Only show if we have API data */}
-        {strategyData && (strategyData.keyInsights.length > 0 || strategyData.bestPractices.length > 0) && (
+        {strategyData && (currentStrategies.keyInsights.length > 0 || currentStrategies.bestPractices.length > 0) && (
           <div className="space-y-6">
             {/* Key Insights */}
-            {strategyData.keyInsights.length > 0 && (
+            {currentStrategies.keyInsights.length > 0 && (
               <Card className="p-6 border border-gray-200 dark:border-gray-800 bg-white dark:bg-black shadow-sm">
                 <CardHeader className="p-0 pb-6">
                   <CardTitle className="flex items-center gap-3 text-xl text-black dark:text-white">
@@ -963,7 +964,7 @@ export default function MitigationStrategyPage() {
                 </CardHeader>
                 <CardContent className="p-0">
                   <div className="grid grid-cols-1 gap-4">
-                    {strategyData.keyInsights.map((insight, index) => (
+                    {currentStrategies.keyInsights.map((insight, index) => (
                       <div key={index} className="flex items-start gap-3 p-4 bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-100 dark:border-gray-800">
                         <div className="w-6 h-6 bg-gray-200 dark:bg-gray-800 text-black dark:text-white rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">
                           {index + 1}
@@ -977,7 +978,7 @@ export default function MitigationStrategyPage() {
             )}
 
             {/* Best Practices */}
-            {strategyData.bestPractices.length > 0 && (
+            {currentStrategies.bestPractices.length > 0 && (
               <Card className="p-6 border border-gray-200 dark:border-gray-800 bg-white dark:bg-black shadow-sm">
                 <CardHeader className="p-0 pb-6">
                   <CardTitle className="flex items-center gap-3 text-xl text-black dark:text-white">
@@ -989,7 +990,7 @@ export default function MitigationStrategyPage() {
                 </CardHeader>
                 <CardContent className="p-0">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {strategyData.bestPractices.map((practice, index) => (
+                    {currentStrategies.bestPractices.map((practice, index) => (
                       <div key={index} className="flex items-start gap-3 p-4 bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-100 dark:border-gray-800">
                         <CheckCircle className="w-4 h-4 text-black dark:text-white mt-0.5 flex-shrink-0" />
                         <p className="text-sm leading-relaxed text-gray-700 dark:text-gray-300">{practice}</p>
