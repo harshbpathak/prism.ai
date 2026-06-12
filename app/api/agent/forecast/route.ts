@@ -82,7 +82,7 @@ class ProductionForecastAgent {
     const traceId = `forecast-adk-${Date.now()}`;
     logger.info({ message: 'Generating forecast via ADK', supplyChainId: params.supplyChainId, traceId });
 
-    const prompt = `You are a supply chain risk expert. Generate realistic, high-impact disruption forecast scenarios for the following supply chain:
+    const prompt = `You are a supply chain risk intelligence analyst specializing in predictive threat modeling.
 
 SUPPLY CHAIN: ${supplyChain.name || 'Unknown'}
 DESCRIPTION: ${supplyChain.description || 'No description provided'}
@@ -95,9 +95,14 @@ FORECAST HORIZON: ${params.forecastHorizon} days
 RECENT INTELLIGENCE: ${intelSummary}
 
 REQUIREMENTS:
-- Generate 2–4 HIGH-IMPACT scenarios that are SPECIFIC to this supply chain's actual nodes and structure
-- Use the actual node names (${nodeNames}) in affectedNode fields where possible
-- Base severity and probability on real supply chain risk patterns
+- Generate 4–6 disruption forecasts. Each forecast must satisfy all of the following:
+1. Geography: tied to a country or region where at least one node in the network is located. Do not forecast events for regions absent from the node list.
+2. Event type diversity: cover distinct categories (natural disaster, geopolitical, labor action, infrastructure failure, cyber threat). Do not repeat the same event type more than twice.
+3. Severity (1–5): calibrate against real-world precedent (1=minor delay, 5=catastrophic).
+4. Probability (0.00–1.00): ground the value in known regional base rates (e.g., typhoon probability for SE Asia is high). Do not assign > 0.85 unless very high historical frequency.
+5. Duration: based on comparable historical incidents.
+- Use the actual node names (${nodeNames}) in affectedNode fields where possible.
+- Return the exact JSON schema requested.
 - Each scenario must be unique and cover different risk categories
 - Include at least one scenario affecting a key hub node (high-connectivity node)
 - Make descriptions specific and quantified (e.g., "78% probability", "40% reduction in capacity")

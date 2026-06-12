@@ -946,13 +946,13 @@ ANALYSIS METADATA:
     
     try {
       const analysisPrompt = `
-As an expert supply chain impact assessment AI, analyze this supply chain disruption scenario and provide comprehensive impact analysis.
-
-SUPPLY CHAIN CONTEXT:
-${JSON.stringify(supplyChainData.supplyChain, null, 2)}
+You are a supply chain financial impact analyst.
 
 DISRUPTION SCENARIO:
 ${JSON.stringify(supplyChainData.simulation, null, 2)}
+
+SUPPLY CHAIN CONTEXT:
+${JSON.stringify(supplyChainData.supplyChain, null, 2)}
 
 NETWORK TOPOLOGY:
 - Total Nodes: ${supplyChainData.nodes.length}
@@ -965,9 +965,16 @@ ${memoryContext}
 IMPACT PROPAGATION DATA:
 ${JSON.stringify(impactPropagation, null, 2)}
 
+ANALYST INSTRUCTIONS:
+Step 1 — Graph traversal: starting from the disrupted node, follow edges in their directed downstream flow. Collect every node reachable from the disrupted node, directly or transitively.
+Step 2 — Per-node assessment: for each downstream node found, assign an impactType (e.g., delay, capacityLoss, shutdown, costIncrease) and calculate estimated financial loss scaled by node type, hop distance, and severity.
+Step 3 — Totals: Calculate total cascading cost impact and operational days lost based on the downstream propagation.
+
+Do not include the disrupted node itself in downstream impacts.
+Do not include nodes unreachable from the disrupted node.
+
 CRITICAL FORMATTING REQUIREMENTS:
 You MUST format ALL key metrics in the following standardized, human-friendly format:
-
 - totalCostImpact: Use format "$XXXk - $XXXk" (e.g., "$500K - $750K", "$1.2M - $1.8M")
 - averageDelay: Use format "XX-XX days" (e.g., "30-45 days", "60-90 days")
 - inventoryReduction: Use format "XX-XX%" (e.g., "20-30%", "15-25%")
@@ -976,9 +983,8 @@ You MUST format ALL key metrics in the following standardized, human-friendly fo
 - timeToImplement (in mitigation strategies): Use format "XX-XX days" or "XX-XX weeks"
 - riskReduction (in mitigation strategies): Use format "XX-XX%" showing effectiveness range
 
-NEVER use raw numbers or single values. Always provide ranges that reflect confidence intervals and realistic variance.
-
-Please provide a comprehensive impact assessment following the structured format required.
+NEVER use raw numbers or single values for these fields. Always provide ranges that reflect confidence intervals and realistic variance.
+Please provide a comprehensive impact assessment matching the strict JSON schema required.
       `
 
       // Configure Google provider with dedicated key if available
@@ -1024,65 +1030,260 @@ Please provide a comprehensive impact assessment following the structured format
           // Quota/rate-limit errors — no point retrying immediately
           const isRateLimit = errMsg.includes('quota') || errMsg.includes('rate') || errMsg.includes('429') || errMsg.includes('RESOURCE_EXHAUSTED') || errMsg.toLowerCase().includes('overloaded') || errMsg.toLowerCase().includes('temporary');
           if (isRateLimit) {
-            console.error('❌ AI quota/overload exceeded — using fallback data:', errMsg);
-            // Return fallback instead of throwing error when Google AI is overloaded
-            return this.generateFallbackImpactData(impactPropagation);
+            console.error('❌ AI quota/overload exceeded — using BFS baseline algorithm:', errMsg);
+            return this.generateFallbackImpactData(impactPropagation, supplyChainData.nodes, supplyChainData.edges, supplyChainData.simulation);
           }
           retries--;
           console.warn(`⚠️ AI generation failed. Retries left: ${retries}. Error:`, errMsg);
           if (retries < 0) {
-            console.warn('❌ AI generation retries exhausted — using fallback data.');
-            return this.generateFallbackImpactData(impactPropagation);
+            console.warn('❌ AI generation retries exhausted — using BFS baseline algorithm.');
+            return this.generateFallbackImpactData(impactPropagation, supplyChainData.nodes, supplyChainData.edges, supplyChainData.simulation);
           }
           await new Promise(resolve => setTimeout(resolve, 2000));
         }
       }
-      return this.generateFallbackImpactData(impactPropagation);
+      return this.generateFallbackImpactData(impactPropagation, supplyChainData.nodes, supplyChainData.edges, supplyChainData.simulation);
     } catch (error) {
-      console.error('❌ Error in AI analysis generation, using fallback:', error)
-      return this.generateFallbackImpactData(impactPropagation);
+      console.error('❌ Error in AI analysis generation, using BFS baseline algorithm:', error)
+      return this.generateFallbackImpactData(impactPropagation, supplyChainData.nodes, supplyChainData.edges, supplyChainData.simulation);
     }
   }
 
-  // Fallback data generator when AI is overloaded/rate-limited
-  private generateFallbackImpactData(impactPropagation: any): any {
+  // ─── BFS Baseline Impact Algorithm ───────────────────────────────────────────
+  // Deterministic expert-system fallback that runs when the LLM is unavailable.
+  // Uses graph traversal + rule-based cost tables to produce defensible numbers.
+  // ─────────────────────────────────────────────────────────────────────────────
+  private generateFallbackImpactData(impactPropagation: any, nodes: Node[] = [], edges: Edge[] = [], simulation?: any): any {
+    console.log(`🔢 [BFS-BASELINE] Running deterministic impact assessment on ${nodes.length} nodes, ${edges.length} edges`);
+
+    // ── Cost lookup table by node type (USD base cost) ──
+    const BASE_COSTS: Record<string, number> = {
+      port:         500000,
+      factory:      300000,
+      manufacturer: 300000,
+      supplier:     200000,
+      warehouse:     80000,
+      distributor:   60000,
+      retailer:      40000,
+      other:         30000,
+    };
+
+    // ── Hop decay (impact weakens with graph distance) ──
+    const getHopDecay = (hop: number): number => {
+      if (hop === 1) return 1.0;
+      if (hop === 2) return 0.5;
+      if (hop === 3) return 0.2;
+      return 0.05;
+    };
+
+    // ── Impact type multiplier ──
+    const IMPACT_MULTIPLIER: Record<string, number> = {
+      shutdown:      1.5,
+      capacityLoss:  1.0,
+      delay:         0.6,
+      costIncrease:  0.3,
+    };
+
+    // ── Assign impact type by hop distance and node type ──
+    const getImpactType = (nodeType: string, hop: number): string => {
+      const t = nodeType.toLowerCase();
+      if (hop === 1) {
+        if (t === 'factory' || t === 'manufacturer' || t === 'port') return 'shutdown';
+        return 'capacityLoss';
+      }
+      if (hop === 2) return 'delay';
+      return 'costIncrease';
+    };
+
+    // ── Step 1: Build downstream adjacency map ──
+    const downstream = new Map<string, string[]>();
+    const nodeById = new Map<string, any>();
+    nodes.forEach(n => {
+      nodeById.set(n.node_id, n);
+      downstream.set(n.node_id, []);
+    });
+    edges.forEach(e => {
+      const list = downstream.get(e.from_node_id) || [];
+      list.push(e.to_node_id);
+      downstream.set(e.from_node_id, list);
+    });
+
+    // ── Step 2: Determine seed (disrupted) nodes ──
+    const directlyAffected: string[] = impactPropagation?.directlyAffected || [];
+    const seedNodes = directlyAffected.length > 0
+      ? directlyAffected
+      : (nodes.length > 0 ? [nodes[0].node_id] : []);
+
+    // ── Step 3: BFS from disrupted nodes ──
+    const visited = new Set<string>(seedNodes);
+    const queue: Array<{ nodeId: string; hop: number; path: string[] }> =
+      seedNodes.map(id => ({ nodeId: id, hop: 1, path: [id] }));
+
+    interface ImpactRecord {
+      nodeId: string; nodeName: string; nodeType: string;
+      impactType: string; estimatedLoss: number; hop: number; path: string[];
+    }
+    const downstreamImpacts: ImpactRecord[] = [];
+    let head = 0;
+    while (head < queue.length) {
+      const { nodeId, hop, path } = queue[head++];
+      const node = nodeById.get(nodeId);
+      if (!node) continue;
+
+      const nodeType = ((node.type || node.node_type || 'other') as string).toLowerCase();
+      const impactType = getImpactType(nodeType, hop);
+      const baseCost = BASE_COSTS[nodeType] ?? BASE_COSTS['other'];
+      const estimatedLoss = Math.round(baseCost * getHopDecay(hop) * IMPACT_MULTIPLIER[impactType]);
+
+      downstreamImpacts.push({
+        nodeId,
+        nodeName: node.name || node.label || nodeId,
+        nodeType,
+        impactType,
+        estimatedLoss,
+        hop,
+        path,
+      });
+
+      for (const neighborId of (downstream.get(nodeId) || [])) {
+        if (!visited.has(neighborId)) {
+          visited.add(neighborId);
+          queue.push({ nodeId: neighborId, hop: hop + 1, path: [...path, neighborId] });
+        }
+      }
+    }
+
+    // ── Step 4: Compute totals ──
+    const totalCostImpact = downstreamImpacts.reduce((s, n) => s + n.estimatedLoss, 0);
+    const shutdownCount    = downstreamImpacts.filter(n => n.impactType === 'shutdown').length;
+    const capacityLossCount = downstreamImpacts.filter(n => n.impactType === 'capacityLoss').length;
+    const delayCount       = downstreamImpacts.filter(n => n.impactType === 'delay').length;
+    const costIncreaseCount = downstreamImpacts.filter(n => n.impactType === 'costIncrease').length;
+    const operationalDaysLost = Math.min(30, shutdownCount * 7 + capacityLossCount * 3 + delayCount * 1);
+
+    const formatCost = (n: number): string => {
+      if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M - $${(n * 1.4 / 1_000_000).toFixed(1)}M`;
+      return `$${Math.round(n / 1000)}K - $${Math.round(n * 1.4 / 1000)}K`;
+    };
+
+    const totalNodes = nodes.length;
+    const totalEdges = edges.length;
+    const networkDensity = totalNodes > 1
+      ? parseFloat((totalEdges / (totalNodes * (totalNodes - 1))).toFixed(3))
+      : 0;
+    const maxHop = downstreamImpacts.length > 0 ? Math.max(...downstreamImpacts.map(n => n.hop)) : 0;
+    const avgHop = downstreamImpacts.length > 0
+      ? parseFloat((downstreamImpacts.reduce((s, n) => s + n.hop, 0) / downstreamImpacts.length).toFixed(1))
+      : 1;
+
+    // ── Step 5: Build schema-conforming cascading effects ──
+    const cascadingEffects = downstreamImpacts.map(impact => ({
+      affectedNode: impact.nodeName,
+      impactType: impact.impactType === 'shutdown' || impact.impactType === 'capacityLoss' ? 'operational' : impact.impactType === 'delay' ? 'supply' : 'financial',
+      severity: impact.impactType === 'shutdown' ? 'CRITICAL' : impact.impactType === 'capacityLoss' ? 'HIGH' : impact.impactType === 'delay' ? 'MEDIUM' : 'LOW',
+      timeline: impact.hop === 1 ? 'Immediate (Day 1–3)' : impact.hop === 2 ? 'Short-term (Day 4–10)' : 'Medium-term (Day 11–30)',
+      propagationPath: impact.path.map(id => nodeById.get(id)?.name || nodeById.get(id)?.label || id),
+      probability: impact.impactType === 'shutdown' ? 0.95 : impact.impactType === 'capacityLoss' ? 0.80 : impact.impactType === 'delay' ? 0.65 : 0.40,
+      financialImpact: formatCost(impact.estimatedLoss),
+      mitigationComplexity: impact.impactType === 'shutdown' ? 'HIGH' : impact.impactType === 'capacityLoss' ? 'MEDIUM' : 'LOW',
+    }));
+
+    console.log(`✅ [BFS-BASELINE] Identified ${downstreamImpacts.length} affected nodes across ${maxHop} hops. Total exposure: ${formatCost(totalCostImpact)}`);
+
     return {
-      executiveSummary: "Due to current AI provider service limitations (model overloaded), this impact analysis was generated using algorithmic baseline calculations. A mid-to-high level disruption is anticipated across the directly affected nodes with moderate cascading effects to downstream facilities.",
-      financialImpact: {
-        totalCostImpact: "$250K - $850K",
-        revenueAtRisk: "$1.5M - $3.2M",
-        costBreakdown: [
-          { category: "Logistics", amount: "$150K", percentage: 40 },
-          { category: "Inventory", amount: "$80K", percentage: 25 },
-          { category: "Operational", amount: "$20K", percentage: 35 }
-        ]
+      scenarioName: simulation?.name || 'Disruption Analysis',
+      scenarioType: simulation?.scenario_type || 'Infrastructure',
+      status: 'completed',
+      completedAt: new Date().toISOString(),
+      metrics: {
+        totalCostImpact: formatCost(totalCostImpact),
+        averageDelay: `${operationalDaysLost}-${Math.min(30, operationalDaysLost + 10)} days`,
+        inventoryReduction: shutdownCount > 0 ? '20-35%' : capacityLossCount > 0 ? '10-20%' : '5-10%',
+        recoveryTime: `${operationalDaysLost * 2}-${operationalDaysLost * 3 || 7} days`,
+        affectedNodes: downstreamImpacts.length,
+        criticalPath: downstreamImpacts
+          .filter(n => n.impactType === 'shutdown')
+          .map(n => n.nodeName)
+          .join(' → ') || (downstreamImpacts[0]?.nodeName ?? 'No critical path identified'),
+        networkResilience: Math.max(0, Math.round(100 - (downstreamImpacts.length / Math.max(1, totalNodes)) * 100)),
+        cascadingProbability: Math.min(0.95, 0.3 + downstreamImpacts.length * 0.05),
       },
-      operationalImpact: {
-        averageDelay: "15-30 days",
-        inventoryReduction: "15-20%",
-        capacityUtilization: 65,
-        criticalShortages: ["Raw Materials", "Logistics Capacity"]
-      },
+      keyFindings: [
+        `BFS traversal from ${seedNodes.length} disrupted node(s) reached ${downstreamImpacts.length} downstream node(s) across ${maxHop} hop(s).`,
+        `${shutdownCount} node(s) face complete operational shutdown — highest priority recovery targets.`,
+        `${capacityLossCount} node(s) operating at reduced capacity; ${delayCount} node(s) experiencing throughput delays.`,
+        `Estimated total financial exposure: ${formatCost(totalCostImpact)} (conservative to upper-bound range).`,
+        `Operational recovery baseline: ${operationalDaysLost} days under current network topology.`,
+        'Analysis generated by deterministic BFS expert system (baseline mode — AI provider unavailable).',
+      ],
+      impactBreakdown: [
+        `Hop 1 — Direct shutdowns: ${shutdownCount} node(s), exposure ${formatCost(downstreamImpacts.filter(n => n.impactType === 'shutdown').reduce((s, n) => s + n.estimatedLoss, 0))}.`,
+        `Hop 1 — Capacity reductions: ${capacityLossCount} node(s), throughput reduced 40–60%.`,
+        `Hop 2 — Downstream delays: ${delayCount} node(s), deferring throughput by up to ${operationalDaysLost} days.`,
+        `Hop 3+ — Cost pressures: ${costIncreaseCount} node(s), elevated operational costs without shutdown.`,
+        `Network density ${networkDensity} — ${networkDensity < 0.3 ? 'sparse topology increases single-point-of-failure risk' : 'moderate redundancy provides some buffering'}.`,
+      ],
+      riskFactors: [
+        'Deterministic BFS identifies structural blast radius but does not capture stochastic demand variability.',
+        `${shutdownCount} critical node(s) with no bypass in current graph topology.`,
+        'Cost estimates use industry-average base costs per node type; actual exposure may vary by 40%.',
+      ],
       mitigationStrategies: [
         {
-          id: "mitigation-1",
-          title: "Expedite Alternative Transportation",
-          description: "Immediately activate secondary freight and air transport allocations where feasible.",
-          estimatedCost: "$100K - $150K",
-          timeToImplement: "3-5 days",
-          riskReduction: "40-60%",
-          difficulty: "Medium"
+          strategy: 'Activate emergency rerouting through secondary nodes to bypass shutdown facilities.',
+          estimatedCost: formatCost(Math.round(totalCostImpact * 0.15)),
+          timeToImplement: '2-5 days',
+          riskReduction: '40-55%',
+          feasibility: 'HIGH',
+          priority: 'IMMEDIATE',
+          dependencies: ['Secondary node availability', 'Logistics coordination'],
+          successProbability: 0.80,
+          roi: 3.2,
         },
         {
-          id: "mitigation-2",
-          title: "Reallocate Strategic Inventory",
-          description: "Redistribute existing inventory from unaffected regional warehouses to balance fulfillment.",
-          estimatedCost: "$50K - $75K",
-          timeToImplement: "1-3 days",
-          riskReduction: "25-35%",
-          difficulty: "Low"
-        }
-      ]
+          strategy: 'Deploy safety stock from unaffected warehouses to buffer downstream shortfalls.',
+          estimatedCost: formatCost(Math.round(totalCostImpact * 0.08)),
+          timeToImplement: '1-3 days',
+          riskReduction: '20-30%',
+          feasibility: 'HIGH',
+          priority: 'IMMEDIATE',
+          dependencies: ['Inventory visibility', 'Transport capacity'],
+          successProbability: 0.85,
+          roi: 4.1,
+        },
+        {
+          strategy: 'Negotiate expedited contracts with alternate suppliers or 3PL providers for affected routes.',
+          estimatedCost: formatCost(Math.round(totalCostImpact * 0.25)),
+          timeToImplement: '7-14 days',
+          riskReduction: '55-70%',
+          feasibility: 'MEDIUM',
+          priority: 'SHORT_TERM',
+          dependencies: ['Vendor qualification', 'Contract approval'],
+          successProbability: 0.70,
+          roi: 2.5,
+        },
+      ],
+      cascadingEffects,
+      networkAnalysis: {
+        totalNodes,
+        totalEdges,
+        networkDensity,
+        criticalNodes: downstreamImpacts.filter(n => n.impactType === 'shutdown').map(n => n.nodeName),
+        singlePointsOfFailure: downstreamImpacts.filter(n => n.impactType === 'shutdown' && n.hop === 1).map(n => n.nodeName),
+        alternativeRoutes: Math.max(0, totalEdges - downstreamImpacts.length),
+        averageShortestPath: avgHop,
+        clusteringCoefficient: parseFloat(Math.min(0.8, networkDensity * 2).toFixed(2)),
+      },
+      confidenceScore: nodes.length > 0 ? 0.72 : 0.40,
+      monteCarloRuns: 0,
+      analysisDepth: nodes.length > 0 ? 'INTERMEDIATE' : 'BASIC',
+      processingTime: 0,
+      dataQuality: {
+        completeness: nodes.length > 0 ? 0.85 : 0.40,
+        consistency: 0.90,
+        recency: 0.75,
+      },
+      isBaselineFallback: true,
     };
   }
 }

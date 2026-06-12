@@ -91,6 +91,12 @@ class ProductionStrategyAgent {
         .select('*')
         .eq('simulation_id', simulationId);
 
+      // 3. Fetch nodes for baseline algorithm context (needed if AI falls back)
+      const { data: strategyNodes } = await supabaseServer
+        .from('nodes')
+        .select('node_id, name, type, node_type')
+        .eq('supply_chain_id', simulation.supply_chain_id);
+
       // 3. Optional: Gather Tavily Intel
       let marketIntel = "";
       if (process.env.TAVILY_API_KEY) {
@@ -111,12 +117,22 @@ class ProductionStrategyAgent {
         Market Context (Recent News/Research): ${marketIntel}
         
         Using the strategy_intelligence tool, research best practices for this type of disruption.
-        Then, generate a comprehensive strategic mitigation plan.
+        Then, generate exactly 3 highly specific mitigation strategies, distributing them across immediate, shortTerm, and longTerm arrays.
         
-        Structure your response as a valid JSON object with:
-        - immediate: Array of strategies (0-24h). Each must have a 'priority' field ('low', 'medium', 'high', 'critical').
-        - shortTerm: Array of strategies (1-30d). Each must have a 'priority' field ('low', 'medium', 'high', 'critical').
-        - longTerm: Array of strategies (30d+). Each must have a 'priority' field ('low', 'medium', 'high', 'critical').
+        For each strategy:
+        - Title: 3–6 words, specific to the disruption.
+        - Description: concrete actions referencing the exact node names and impact results. No generic advice.
+        - costEstimate: Scale proportionally to the number of affected nodes (ports/factories carry higher costs).
+        - impactReduction (riskReductionPct): Estimate how much of the current disruption impact this strategy eliminates.
+        - priority: 'low', 'medium', 'high', or 'critical'.
+        
+        If the impact results contain fewer than 3 affected nodes, keep cost estimates conservative.
+        Do not fabricate node names not present in the assessment.
+
+        Structure your response exactly according to the schema provided:
+        - immediate: Array of strategies (0-7 days).
+        - shortTerm: Array of strategies (1-3 months).
+        - longTerm: Array of strategies (3-12 months).
         - riskMitigationMetrics: Object with currentRisk (0-100), targetRisk, and expectedROI.
       `;
 
@@ -130,7 +146,7 @@ class ProductionStrategyAgent {
             const agent = new LlmAgent({
               name: "strategy_agent",
               description: "Generates strategic resilience plans",
-              instruction: "You are a senior supply chain risk consultant. Provide highly actionable and data-driven mitigation strategies.",
+              instruction: "You are a senior supply chain resilience strategist. Provide highly actionable and data-driven mitigation strategies.",
               model: new Gemini({ 
                 model: AI_MODELS.agents, 
                 apiKey: getAIKeyForModule("agents")
@@ -164,16 +180,16 @@ class ProductionStrategyAgent {
           const isRateLimit = errMsg.includes('quota') || errMsg.includes('rate') || errMsg.includes('429') || errMsg.includes('RESOURCE_EXHAUSTED') || errMsg.toLowerCase().includes('overloaded');
           
           if (isRateLimit) {
-            console.error('[STRATEGY-AGENT] ❌ AI quota/overload exceeded — using fallback data:', errMsg);
-            resultObject = generateFallbackStrategyData();
+            console.error('[STRATEGY-AGENT] ❌ AI quota/overload exceeded — using playbook baseline:', errMsg);
+            resultObject = generateFallbackStrategyData(simulation, impactResults || [], strategyNodes || []);
             break;
           }
           
           retries--;
           console.warn(`[STRATEGY-AGENT] ⚠️ AI generation failed. Retries left: ${retries}. Error:`, errMsg);
           if (retries < 0) {
-            console.warn('[STRATEGY-AGENT] ❌ AI generation retries exhausted — using fallback data.');
-            resultObject = generateFallbackStrategyData();
+            console.warn('[STRATEGY-AGENT] ❌ AI generation retries exhausted — using playbook baseline.');
+            resultObject = generateFallbackStrategyData(simulation, impactResults || [], strategyNodes || []);
             break;
           }
           await new Promise(resolve => setTimeout(resolve, 2000));
@@ -181,7 +197,7 @@ class ProductionStrategyAgent {
       }
 
       if (!resultObject) {
-        resultObject = generateFallbackStrategyData();
+        resultObject = generateFallbackStrategyData(simulation, impactResults || [], strategyNodes || []);
       }
 
       const strategyAnalysis = {
@@ -243,87 +259,234 @@ class ProductionStrategyAgent {
   }
 }
 
-// Fallback data generator when AI is overloaded/rate-limited
-function generateFallbackStrategyData() {
+// ─── Playbook Baseline Strategy Algorithm ───────────────────────────────────────
+// Deterministic expert-system fallback that runs when the LLM is unavailable.
+// Identifies disrupted node type → severity tier → playbook lookup → name injection.
+// ─────────────────────────────────────────────────────────────
+function generateFallbackStrategyData(simulation: any = {}, impactResults: any[] = [], nodes: any[] = []) {
+  console.log(`📚 [PLAYBOOK-BASELINE] Running strategy playbook for scenario: ${simulation?.scenario_type || 'unknown'}`);
+
+  // ── Step 1: Identify disrupted node ──
+  const affectedNodeId =
+    simulation?.parameters?.affectedNode ||
+    simulation?.parameters?.affected_nodes?.[0] ||
+    null;
+  const disruptedNode = nodes.find((n: any) => n.node_id === affectedNodeId);
+  const disruptedNodeType = ((disruptedNode?.type || disruptedNode?.node_type || 'warehouse') as string).toLowerCase();
+  const disruptedNodeLabel = disruptedNode?.name || 'the disrupted node';
+
+  // ── Step 2: Severity tier from impact results ──
+  let totalCost = 0;
+  if (impactResults.length > 0) {
+    const r = impactResults[0];
+    totalCost = r?.total_cost || r?.cost_impact || r?.estimated_loss || 500000;
+  }
+  const severityTier = totalCost >= 1_000_000 ? 3 : totalCost >= 200_000 ? 2 : 1;
+
+  const formatCost = (n: number): string =>
+    n >= 1_000_000 ? `$${(n / 1_000_000).toFixed(1)}M` : `$${Math.round(n / 1000)}K`;
+
+  // ── Step 3: Playbook lookup matrix ──
+  type PlaybookRow = {
+    title: string; desc: string; cost: number; reduction: number;
+    priority: 'Critical' | 'High' | 'Medium' | 'Low' | 'Strategic';
+    feasibility: 'HIGH' | 'MEDIUM' | 'LOW';
+    deps: string[]; risks: string[]; metrics: string[];
+    equipment: string[]; partnerships: string[];
+  };
+  type Playbook = { immediate: PlaybookRow; short: PlaybookRow; long: PlaybookRow };
+
+  const PLAYBOOK: Record<string, Playbook> = {
+    port: {
+      immediate: {
+        title: 'Activate Emergency Air Freight',
+        desc: `Reroute critical shipments from ${disruptedNodeLabel} to air freight channels for tier-1 SKUs immediately.`,
+        cost: 80_000 * severityTier, reduction: 40, priority: 'Critical', feasibility: 'HIGH',
+        deps: ['Air freight capacity', 'Customs pre-clearance'],
+        risks: ['Air freight cost spike', 'Weight/volume limits'],
+        metrics: ['% volume rerouted', 'Delivery time recovery'],
+        equipment: ['Air cargo booking system', 'Customs documentation'],
+        partnerships: ['Air freight carriers', 'Customs brokers'],
+      },
+      short: {
+        title: 'Qualify Alternate Port Routing',
+        desc: `Establish documented procedures through the nearest alternate port to replace ${disruptedNodeLabel}.`,
+        cost: 150_000 * severityTier, reduction: 55, priority: 'High', feasibility: 'HIGH',
+        deps: ['Port authority agreements', 'Logistics partner contracts'],
+        risks: ['Alternative port congestion', 'Lead time increases'],
+        metrics: ['Alternate port throughput', 'Transit time delta'],
+        equipment: ['Port scheduling software'], partnerships: ['Alternate port operators', 'Freight forwarders'],
+      },
+      long: {
+        title: 'Geographic Port Diversification',
+        desc: `Distribute shipping volume across two or more ports in different geopolitical zones to eliminate ${disruptedNodeLabel} as a single point of failure.`,
+        cost: 400_000 * severityTier, reduction: 70, priority: 'Strategic', feasibility: 'MEDIUM',
+        deps: ['Volume redistribution analysis', 'Multi-port contracts'],
+        risks: ['Increased complexity', 'Split shipment overhead'],
+        metrics: ['Port concentration index', 'Risk-adjusted lead time'],
+        equipment: ['TMS with multi-port routing'], partnerships: ['Multiple port operators', 'Regional freight networks'],
+      },
+    },
+    factory: {
+      immediate: {
+        title: 'Emergency Production Shift',
+        desc: `Shift production schedules at unaffected facilities to compensate for output loss from ${disruptedNodeLabel}.`,
+        cost: 60_000 * severityTier, reduction: 30, priority: 'Critical', feasibility: 'HIGH',
+        deps: ['Spare capacity at alternate facilities', 'Tooling compatibility'],
+        risks: ['Overtime costs', 'Quality variance'],
+        metrics: ['Production volume recovered', 'Quality rejection rate'],
+        equipment: ['Production scheduling system'], partnerships: ['Alternate manufacturing sites'],
+      },
+      short: {
+        title: 'Contract Manufacturing Activation',
+        desc: `Engage pre-qualified contract manufacturers to absorb volume from ${disruptedNodeLabel}.`,
+        cost: 200_000 * severityTier, reduction: 50, priority: 'High', feasibility: 'HIGH',
+        deps: ['CMO qualification status', 'Quality agreement'],
+        risks: ['IP exposure', 'Ramp-up time'],
+        metrics: ['CMO output ramp rate', 'Quality audit score'],
+        equipment: ['Quality management system'], partnerships: ['Contract manufacturers', 'Quality auditors'],
+      },
+      long: {
+        title: 'Redundant Production Facility',
+        desc: `Establish a geographically distinct secondary facility to mirror ${disruptedNodeLabel} production capability.`,
+        cost: 800_000 * severityTier, reduction: 75, priority: 'Strategic', feasibility: 'MEDIUM',
+        deps: ['Capital investment approval', 'Regulatory filings'],
+        risks: ['Capex intensity', 'Long lead time'],
+        metrics: ['Dual-site production coverage', 'BCP readiness score'],
+        equipment: ['Full production line'], partnerships: ['EPC contractors', 'Local authorities'],
+      },
+    },
+    supplier: {
+      immediate: {
+        title: 'Activate Secondary Supplier',
+        desc: `Switch purchase orders from ${disruptedNodeLabel} to pre-qualified backup suppliers immediately.`,
+        cost: 40_000 * severityTier, reduction: 45, priority: 'Critical', feasibility: 'HIGH',
+        deps: ['Approved supplier list', 'Safety stock levels'],
+        risks: ['Secondary supplier capacity limits', 'Price premium'],
+        metrics: ['PO transfer rate', 'Delivery schedule adherence'],
+        equipment: ['Procurement system'], partnerships: ['Secondary suppliers', 'Spot market brokers'],
+      },
+      short: {
+        title: 'Safety Stock Build Program',
+        desc: `Accelerate safety stock replenishment across critical SKUs sourced from ${disruptedNodeLabel}.`,
+        cost: 100_000 * severityTier, reduction: 40, priority: 'High', feasibility: 'HIGH',
+        deps: ['Warehouse capacity', 'Working capital approval'],
+        risks: ['Holding cost increase', 'Demand forecast accuracy'],
+        metrics: ['Days of supply coverage', 'Stock-out rate reduction'],
+        equipment: ['Inventory management system'], partnerships: ['Secondary suppliers', 'Warehouse operators'],
+      },
+      long: {
+        title: 'Multi-Source Procurement Policy',
+        desc: `Mandate multi-source qualification for all critical materials previously sole-sourced from ${disruptedNodeLabel}.`,
+        cost: 250_000 * severityTier, reduction: 65, priority: 'Strategic', feasibility: 'MEDIUM',
+        deps: ['Sourcing policy update', 'Supplier qualification program'],
+        risks: ['Qualification timeline', 'Volume fragmentation'],
+        metrics: ['Supplier concentration index', 'Qualified alternate count'],
+        equipment: ['Supplier management platform'], partnerships: ['Multiple qualified suppliers'],
+      },
+    },
+    warehouse: {
+      immediate: {
+        title: 'Cross-Dock to Nearest Facility',
+        desc: `Redirect inbound freight from ${disruptedNodeLabel} to the nearest operational warehouse via cross-docking.`,
+        cost: 25_000 * severityTier, reduction: 35, priority: 'Critical', feasibility: 'HIGH',
+        deps: ['Alternate facility capacity', 'Carrier availability'],
+        risks: ['Distance-related cost increase', 'Handling errors'],
+        metrics: ['Throughput recovered', 'Order fulfillment rate'],
+        equipment: ['WMS', 'Transport management'], partnerships: ['Cross-dock operators', 'Carriers'],
+      },
+      short: {
+        title: 'Temporary 3PL Engagement',
+        desc: `Contract a third-party logistics provider to absorb volume temporarily displaced from ${disruptedNodeLabel}.`,
+        cost: 90_000 * severityTier, reduction: 50, priority: 'High', feasibility: 'HIGH',
+        deps: ['3PL capacity availability', 'System integration'],
+        risks: ['Integration lead time', 'Service level variance'],
+        metrics: ['3PL throughput SLA', 'Customer satisfaction score'],
+        equipment: ['EDI/API integration'], partnerships: ['3PL providers', 'Freight brokers'],
+      },
+      long: {
+        title: 'Regional Distribution Redundancy',
+        desc: `Establish a secondary distribution hub to eliminate ${disruptedNodeLabel} as a regional single point of failure.`,
+        cost: 300_000 * severityTier, reduction: 60, priority: 'Strategic', feasibility: 'MEDIUM',
+        deps: ['Site selection', 'Capital approval'],
+        risks: ['Fixed cost increase', 'Network re-optimization required'],
+        metrics: ['Regional coverage index', 'Lead time variance reduction'],
+        equipment: ['Full WMS deployment'], partnerships: ['Real estate', 'Local workforce'],
+      },
+    },
+  };
+
+  // Map node type to playbook key (manufacturer → factory, distributor/retailer/other → warehouse)
+  const PLAYBOOK_MAP: Record<string, string> = {
+    port: 'port', factory: 'factory', manufacturer: 'factory',
+    supplier: 'supplier', warehouse: 'warehouse',
+    distributor: 'warehouse', retailer: 'warehouse', other: 'warehouse',
+  };
+  const playbookKey = PLAYBOOK_MAP[disruptedNodeType] || 'warehouse';
+  const pb = PLAYBOOK[playbookKey];
+
+  // ── Step 4: Build schema-conforming strategy objects ──
+  const makeStrategy = (
+    id: number,
+    row: PlaybookRow,
+    category: 'immediate' | 'shortTerm' | 'longTerm',
+    timeframe: string,
+  ) => ({
+    id,
+    title: row.title,
+    description: row.desc,
+    priority: row.priority,
+    timeframe,
+    costEstimate: formatCost(row.cost),
+    impactReduction: `${row.reduction}%`,
+    status: (category === 'immediate' ? 'recommended' : 'planning') as 'recommended' | 'planning',
+    category,
+    feasibility: row.feasibility,
+    dependencies: row.deps,
+    riskFactors: row.risks,
+    successMetrics: row.metrics,
+    resourceRequirements: {
+      personnel: category === 'immediate' ? 5 : category === 'shortTerm' ? 10 : 20,
+      equipment: row.equipment,
+      partnerships: row.partnerships,
+    },
+  });
+
+  const totalCostEstimate = pb.immediate.cost + pb.short.cost + pb.long.cost;
+  const avgReduction = Math.round((pb.immediate.reduction + pb.short.reduction + pb.long.reduction) / 3);
+
+  console.log(`✅ [PLAYBOOK-BASELINE] Matched playbook: ${playbookKey}, severity tier: ${severityTier}, total investment: ${formatCost(totalCostEstimate)}`);
+
   return {
-    immediate: [
-      {
-        id: 1,
-        title: "Activate Alternative Transport Routes",
-        description: "Immediately shift critical freight to secondary air and rail networks to bypass the disrupted nodes.",
-        priority: "Critical",
-        timeframe: "0-24 hours",
-        costEstimate: "$100K - $150K",
-        impactReduction: "40-60%",
-        status: "recommended",
-        category: "immediate",
-        feasibility: "HIGH",
-        dependencies: ["Carrier availability", "Customs clearance at secondary ports"],
-        riskFactors: ["Higher spot market rates", "Secondary congestion"],
-        successMetrics: ["Volume successfully rerouted", "Time saved vs waiting"],
-        resourceRequirements: { personnel: 5, equipment: ["Cargo planes", "Trucks"], partnerships: ["3PL providers"] }
-      }
-    ],
-    shortTerm: [
-      {
-        id: 2,
-        title: "Reallocate Strategic Inventory",
-        description: "Redistribute existing inventory from unaffected regional warehouses to balance fulfillment.",
-        priority: "High",
-        timeframe: "1-14 days",
-        costEstimate: "$50K - $75K",
-        impactReduction: "25-35%",
-        status: "recommended",
-        category: "shortTerm",
-        feasibility: "HIGH",
-        dependencies: ["Inventory visibility system", "Warehouse labor"],
-        riskFactors: ["Stockouts in secondary regions"],
-        successMetrics: ["Fulfillment rate maintained", "Customer SLA compliance"],
-        resourceRequirements: { personnel: 10, equipment: ["WMS"], partnerships: ["Last-mile carriers"] }
-      }
-    ],
-    longTerm: [
-      {
-        id: 3,
-        title: "Diversify Supplier Network",
-        description: "Onboard secondary suppliers in different geographic regions to prevent single-point-of-failure disruptions.",
-        priority: "Strategic",
-        timeframe: "30-90 days",
-        costEstimate: "$250K - $500K",
-        impactReduction: "70-90% (future)",
-        status: "planning",
-        category: "longTerm",
-        feasibility: "MEDIUM",
-        dependencies: ["Quality assurance validation", "Contract negotiations"],
-        riskFactors: ["Quality consistency", "Initial capital outlay"],
-        successMetrics: ["Number of qualified suppliers", "Geographic risk distribution"],
-        resourceRequirements: { personnel: 3, equipment: [], partnerships: ["New manufacturing partners"] }
-      }
-    ],
+    immediate: [makeStrategy(1, pb.immediate, 'immediate', '0-7 days')],
+    shortTerm:  [makeStrategy(2, pb.short,     'shortTerm',  '1-3 months')],
+    longTerm:   [makeStrategy(3, pb.long,      'longTerm',   '3-12 months')],
     riskMitigationMetrics: {
-      currentRisk: 85,
-      targetRisk: 30,
-      costToImplement: "$400K - $725K",
-      expectedROI: "3.5x",
-      paybackPeriod: "6-8 months",
-      riskReduction: "65%"
+      currentRisk: Math.min(95, 75 + severityTier * 5),
+      targetRisk: 25,
+      costToImplement: formatCost(totalCostEstimate),
+      expectedROI: severityTier === 3 ? '4.2x' : severityTier === 2 ? '3.1x' : '2.4x',
+      paybackPeriod: severityTier === 3 ? '8-12 months' : severityTier === 2 ? '6-9 months' : '4-6 months',
+      riskReduction: `${avgReduction}%`,
     },
     keyInsights: [
-      "Due to current AI provider service limitations, this is a fallback algorithmic strategy.",
-      "Reliance on a single primary transport node significantly elevates systemic risk.",
-      "Immediate action to secure secondary freight capacity is required before market rates surge."
+      `Disrupted node: ${disruptedNodeLabel} (type: ${disruptedNodeType}), classified as Severity Tier ${severityTier}.`,
+      `Playbook matched: ${playbookKey} disruption protocol applied across three time horizons.`,
+      `Total mitigation investment across all horizons: ${formatCost(totalCostEstimate)}.`,
+      'Analysis generated by rule-based expert system (baseline mode — AI provider unavailable). Results are operationally defensible.',
     ],
     marketIntelligence: [
-      "Industry data shows logistics costs rising 15-20% during similar disruptions.",
-      "Competitors are likely securing alternative capacity simultaneously."
+      `Industry data indicates ${disruptedNodeType} disruptions typically last 15–45 days without active mitigation.`,
+      'Expedited freight and spot procurement costs typically increase 150–300% during regional disruption events.',
     ],
     bestPractices: [
-      "Implement real-time visibility tools across tier-1 and tier-2 suppliers.",
-      "Maintain 15% buffer stock for high-margin SKUs."
+      `Pre-qualify alternate ${playbookKey === 'port' ? 'ports and freight channels' : playbookKey + 's'} before disruptions occur.`,
+      `Maintain minimum 15-day safety stock buffer for critical SKUs routed through ${disruptedNodeLabel}.`,
     ],
     contingencyPlans: [
-      "If secondary ports become congested, pivot to air freight for tier-1 priority customers only."
-    ]
+      `If primary mitigation fails, escalate to full network rerouting that bypasses ${disruptedNodeLabel} entirely.`,
+    ],
+    isBaselineFallback: true,
   };
 }
 

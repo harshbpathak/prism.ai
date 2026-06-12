@@ -1,12 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { generateObject } from 'ai';
-import { createGoogleGenerativeAI } from '@ai-sdk/google';
-import { getAIKeyForModule } from '@/lib/ai-config';
+import { LlmAgent, Gemini, InMemoryRunner, stringifyContent } from '@google/adk';
+import { withTrace } from '../../../../lib/adk/core/trace';
+import { getAIKeyForModule, AI_MODELS } from '@/lib/ai-config';
 import { z } from 'zod';
-
-const google = createGoogleGenerativeAI({
-  apiKey: getAIKeyForModule('agents'),
-});
 
 const RouteOptimizationSchema = z.object({
   severity: z.enum(['Low', 'Medium', 'High']).describe('Severity of the disruption based on the description'),
@@ -29,11 +25,10 @@ export async function POST(req: NextRequest) {
     console.log(`🧠 AI Agent Analyzing disruption at ${nodeName}: ${description}`);
 
     const prompt = `
-    You are an expert Supply Chain Control Tower AI.
-    A disruption has been reported at node: "${nodeName}".
-    Problem description: "${description}"
+    You are a logistics route optimization specialist.
 
-    Analyze the impact of this disruption on the given supply chain network and suggest alternate routes.
+    Failed node ID: ${nodeId} (${nodeName})
+    Disruption: ${description}
     
     Supply Chain Context:
     Nodes: ${JSON.stringify(nodes.map((n:any) => ({ 
@@ -50,16 +45,44 @@ export async function POST(req: NextRequest) {
       userDefinedAlternativeRoutes: e.data?.hasAltRoute ? e.data?.altRouteDetails : null
     })))}
 
-    IMPORTANT: If the disrupted node or its connected routes have user-defined 'preKnownRisks' or 'userDefinedAlternativeRoutes' in the context data above, you MUST explicitly mention them in your analysis and prioritize them as your recommended alternate routes before suggesting new ones.
-    Provide your analysis matching the schema exactly. Keep the alternate routes actionable and specific to the available nodes.
+    Step 1: Identify every route in the graph that passes through the failed node.
+    Step 2: For each affected route, find an alternate path using only nodes and edges present in the graph that does not pass through the failed node. If multiple alternates exist for one route, include only the lowest-cost one.
+    Step 3: Write each alternate route as a string in the format: "NodeName → NodeName → NodeName" using the exact node labels from the graph, ordered from origin to final destination.
+    Step 4: If an alternate route passes through a node that has a known elevated risk (or preKnownRisks), append "(elevated risk)" after that node name in the route string.
+    Step 5: Rank alternateRoutes by lowest additional cost first. If cost data is absent from the graph, rank by fewest additional hops.
+    Step 6: If no complete bypass route exists for any affected path, include the best partial reroute and append "(partial — full bypass unavailable)" to that route string.
+
+    IMPORTANT: If the disrupted node or its connected routes have user-defined 'userDefinedAlternativeRoutes' in the context data above, you MUST explicitly mention them and prioritize them.
+    Provide your analysis matching the JSON schema exactly.
     `;
 
-    const { object } = await generateObject({
-      model: google('gemini-2.5-flash'),
-      schema: RouteOptimizationSchema,
-      prompt: prompt,
-      temperature: 0.3, // Low temperature for consistent analysis
+    const traceId = `route-opt-${Date.now()}`;
+    const traceResult = await withTrace(traceId, 'RouteOptAgent', async () => {
+      const agent = new LlmAgent({
+        name: 'route_optimization_agent',
+        description: 'Analyzes supply chain disruptions and recommends optimal alternate routes.',
+        instruction: 'You are a logistics route optimization specialist. Analyze the disrupted node and supply chain graph, then return alternate routing recommendations as valid JSON matching the schema exactly.',
+        model: new Gemini({ model: AI_MODELS.agents, apiKey: getAIKeyForModule('agents') }),
+        outputSchema: RouteOptimizationSchema,
+      });
+
+      const runner = new InMemoryRunner({ appName: 'route-optimization', agent });
+      let finalContent = '';
+      for await (const event of runner.runEphemeral({
+        userId: 'system',
+        newMessage: { role: 'user', parts: [{ text: prompt }] },
+      })) {
+        const text = stringifyContent(event);
+        if (text) finalContent += text;
+      }
+      return { success: true, data: finalContent };
     });
+
+    if (!traceResult.success) throw new Error(traceResult.error);
+
+    const jsonMatch = (traceResult.data as string).match(/\{[\s\S]*\}/);
+    if (!jsonMatch) throw new Error('Failed to parse route-optimization JSON from ADK');
+    const object = JSON.parse(jsonMatch[0]);
 
     return NextResponse.json(object);
   } catch (error: any) {

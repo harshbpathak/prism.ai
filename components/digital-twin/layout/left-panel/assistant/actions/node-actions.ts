@@ -1,15 +1,7 @@
 import { useCopilotAction } from "@copilotkit/react-core";
 import { toast } from "sonner";
 import { ActionContext } from './types';
-import { useSupplierActions } from './node-actions/supplier-actions';
-import { useManufacturerActions } from './node-actions/manufacturer-actions';
-import { useFactoryActions } from './node-actions/factory-actions';
-import { useWarehouseActions } from './node-actions/warehouse-actions';
-import { useDistributorActions } from './node-actions/distributor-actions';
-import { useRetailerActions } from './node-actions/retailer-actions';
-import { useCustomerActions } from './node-actions/customer-actions';
-import { useThirdPartyLogisticsActions } from './node-actions/3pl-actions';
-import { usePortActions } from './node-actions/port-actions';
+import { useUnifiedNodeActions } from './node-actions/unified-add-node';
 
 type NodeDataWithLocation = {
   label: string;
@@ -20,16 +12,8 @@ type NodeDataWithLocation = {
 export const useNodeActions = ({ nodes, edges, panelId, props }: ActionContext) => {
   const {  onUpdateNode, onUpdateMultipleNodes, onFindAndSelectNode, onAddMultipleEdges, onDeleteNode } = props;
   
-  // Initialize all node-specific actions
-  useSupplierActions({ panelId, props });
-  useManufacturerActions({ panelId, props });
-  useFactoryActions({ panelId, props });
-  useWarehouseActions({ panelId, props });
-  useDistributorActions({ panelId, props });
-  useRetailerActions({ panelId, props });
-  useCustomerActions({ panelId, props });
-  useThirdPartyLogisticsActions({ panelId, props });
-  usePortActions({ panelId, props });
+  // Single unified addNode action replaces 9 per-type actions (saves ~80% tokens per request)
+  useUnifiedNodeActions({ panelId, props });
 
   // Update single node properties
   useCopilotAction({

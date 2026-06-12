@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { useDisruptionSimulation } from '../canvas/hooks/useDisruptionSimulation';
 
 const ControlTowerPanel: FC = () => {
-  const { isControlTowerMode, disruptedNodes, disruptedEdges, nodes, edges, clearDisruptions, disruptionAnalysis, isAnalyzingDisruption, setIsAnalyzingDisruption, setDisruptionAnalysis } = useDigitalTwinStore();
+  const { isControlTowerMode, disruptedNodes, disruptedEdges, nodes, edges, clearDisruptions, disruptionAnalysis, isAnalyzingDisruption, setIsAnalyzingDisruption, setDisruptionAnalysis, updateNode } = useDigitalTwinStore();
   const [isScanning, setIsScanning] = useState(false);
   const { simulateDisruption } = useDisruptionSimulation();
 
@@ -48,17 +48,28 @@ const ControlTowerPanel: FC = () => {
                 });
                 if (response.ok) {
                   const result = await response.json();
-                  if (result.disruptionsFound && result.disruptedNodeId) {
+                  
+                  // Silently update all node risk scores on the canvas based on sentiment
+                  if (result.nodeRisks && Array.isArray(result.nodeRisks)) {
+                    result.nodeRisks.forEach((nr: any) => {
+                      updateNode(nr.nodeId, { riskScore: nr.riskScore });
+                    });
+                  }
+
+                  // Find a critical node (>0.80) to trigger the massive visual disruption alarm
+                  const criticalNode = result.nodeRisks?.find((nr: any) => nr.riskScore > 0.80);
+
+                  if (result.disruptionsFound && criticalNode) {
                     setIsAnalyzingDisruption(true);
-                    simulateDisruption(result.disruptedNodeId);
+                    simulateDisruption(criticalNode.nodeId);
                     
                     // Call the route-optimization agent with the live problem description
                     const analysisRes = await fetch('/api/agent/route-optimization', {
                        method: 'POST',
                        headers: { 'Content-Type': 'application/json' },
                        body: JSON.stringify({
-                         nodeId: result.disruptedNodeId,
-                         description: result.description,
+                         nodeId: criticalNode.nodeId,
+                         description: criticalNode.reason || result.description,
                          nodes: nodes.map(n => ({ id: n.id, data: n.data, type: n.type })),
                          edges: edges.map(e => ({ id: e.id, source: e.source, target: e.target, data: e.data }))
                        })
@@ -68,7 +79,7 @@ const ControlTowerPanel: FC = () => {
                     }
                     setIsAnalyzingDisruption(false);
                   } else {
-                    alert("No live disruptions detected for your supply chain nodes.");
+                    alert("News sentiment applied. No catastrophic disruptions (>0.80 risk) detected. Node risk scores updated silently.");
                   }
                 }
               } catch (err) {
@@ -78,11 +89,15 @@ const ControlTowerPanel: FC = () => {
                 setIsScanning(false);
               }
             }}
-            disabled={isScanning}
-            className="w-full flex items-center justify-center gap-2 py-2 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-lg text-sm font-medium hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors border border-blue-200 dark:border-blue-800"
+            disabled={isScanning || nodes.length === 0}
+            className={`w-full flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-medium transition-colors border ${
+              nodes.length === 0 
+                ? 'bg-gray-100 text-gray-400 border-gray-200 dark:bg-gray-800 dark:text-gray-500 dark:border-gray-700 cursor-not-allowed'
+                : 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/40 border-blue-200 dark:border-blue-800'
+            }`}
           >
             {isScanning ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
-            {isScanning ? "Scanning Global Feeds..." : "Scan Live Intelligence"}
+            {nodes.length === 0 ? "Add Nodes to Scan" : isScanning ? "Scanning Global Feeds..." : "Scan Live Intelligence"}
           </button>
         </div>
       ) : isAnalyzingDisruption ? (

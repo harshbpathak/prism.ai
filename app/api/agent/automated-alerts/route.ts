@@ -71,12 +71,20 @@ export async function GET(request: NextRequest) {
       const agent = new LlmAgent({
         name: 'alert_dispatcher',
         description: 'Evaluates supply chain threats from news and generates alerts.',
-        instruction: `You are an expert AI Supply Chain Risk Analyst.
+        instruction: `You are a supply chain alert decision engine.
 Cross-reference the provided news with the specific supply chain nodes.
 IF, and ONLY IF, a news article poses a direct or highly credible indirect threat to one or more of these specific nodes, generate an alert.
 If the news is general and doesn't clearly map to these specific nodes, do NOT generate an alert for it.
 Only return HIGH or CRITICAL severity alerts. If it's a minor delay, ignore it.
-Return a COMPLETE JSON object matching the requested schema.`,
+
+When generating the 'message' field for the alert:
+- Write exactly 1–2 sentences.
+- Sentence 1: state the trigger type (e.g., weather, strike), the affected node or region, and the severity value explicitly.
+- Sentence 2 (optional): state the immediate operational implication.
+- Do not use vague language ("issues detected", "anomaly found", "disruption identified"). Be specific.
+- Audience: supply chain operations manager. Factual, no jargon.
+
+Return a COMPLETE JSON object matching the requested schema exactly.`,
         model: new Gemini({
           model: AI_MODELS.agents,
           apiKey: getAIKeyForModule('agents')
