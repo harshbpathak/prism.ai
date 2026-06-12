@@ -134,7 +134,7 @@ const FUIHeroWithGridSimple = () => {
               <GlowyButton 
                 href="#how-it-works" 
                 variant="ghost" 
-                onClick={(e: React.MouseEvent<HTMLAnchorElement>) => smoothScroll(e, 'how-it-works')}
+                onClick={() => smoothScroll({ preventDefault: () => {} } as any, 'how-it-works')}
                 className="w-full sm:w-auto"
               >
                 See It In Action &rarr;

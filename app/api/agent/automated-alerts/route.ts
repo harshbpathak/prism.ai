@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabase/server';
 import { tavily } from '@tavily/core';
-import { createGoogleGenerativeAI } from '@ai-sdk/google';
-import { generateObject } from 'ai';
+import { LlmAgent, FunctionTool, Gemini, InMemoryRunner, stringifyContent } from '@google/adk';
 import { z } from 'zod';
 import { getAIKeyForModule, AI_MODELS } from '@/lib/ai-config';
+import { withTrace } from '../../../../lib/adk/core/trace';
 
 // Define the expected structure from Gemini when evaluating news against a supply chain
 const alertSchema = z.object({
@@ -64,36 +64,54 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: true, alertsGenerated: 0, message: "No relevant supply chain news found." });
     }
 
-    // 4. Evaluate Threats using Gemini
-    const google = createGoogleGenerativeAI({
-      apiKey: getAIKeyForModule("agents"),
+    // 4. Evaluate Threats using ADK LlmAgent
+    const traceId = `alert-dispatcher-${Date.now()}`;
+    const traceResult = await withTrace(traceId, 'AlertDispatcherAgent', async () => {
+      const agent = new LlmAgent({
+        name: 'alert_dispatcher',
+        description: 'Evaluates supply chain threats from news and generates alerts.',
+        instruction: `You are an expert AI Supply Chain Risk Analyst.
+Cross-reference the provided news with the specific supply chain nodes.
+IF, and ONLY IF, a news article poses a direct or highly credible indirect threat to one or more of these specific nodes, generate an alert.
+If the news is general and doesn't clearly map to these specific nodes, do NOT generate an alert for it.
+Only return HIGH or CRITICAL severity alerts. If it's a minor delay, ignore it.
+Return a COMPLETE JSON object matching the requested schema.`,
+        model: new Gemini({
+          model: AI_MODELS.agents,
+          apiKey: getAIKeyForModule('agents')
+        }),
+        outputSchema: alertSchema
+      });
+
+      const runner = new InMemoryRunner({ appName: 'alerts', agent });
+      let finalContent = '';
+      const prompt = `
+Critical Nodes:
+${JSON.stringify(topNodes.map(n => ({ id: n.node_id, name: n.name, address: n.address, type: n.type })))}
+
+Latest News:
+${JSON.stringify(searchResult.results.map(r => ({ title: r.title, content: r.content, url: r.url, date: r.publishedDate })))}
+      `;
+
+      for await (const event of runner.runEphemeral({
+        userId: userId || 'system',
+        newMessage: { role: 'user', parts: [{ text: prompt }] },
+      })) {
+        const text = stringifyContent(event);
+        if (text) finalContent += text;
+      }
+
+      // Clean markdown JSON wrapper if present
+      const cleanContent = finalContent.replace(/^```json\n/, '').replace(/\n```$/, '');
+      return { success: true, data: JSON.parse(cleanContent) };
     });
 
-    const prompt = `
-      You are an expert AI Supply Chain Risk Analyst.
-      
-      I have a specific supply chain with the following critical nodes:
-      ${JSON.stringify(topNodes.map(n => ({ id: n.node_id, name: n.name, address: n.address, type: n.type })))}
-
-      I have just pulled the latest live news potentially affecting these regions/components:
-      ${JSON.stringify(searchResult.results.map(r => ({ title: r.title, content: r.content, url: r.url, date: r.publishedDate })))}
-
-      Your task is to cross-reference the news with the supply chain nodes. 
-      IF, and ONLY IF, a news article poses a direct or highly credible indirect threat to one or more of these specific nodes, generate an alert.
-      If the news is general and doesn't clearly map to these specific nodes, do NOT generate an alert for it.
-      
-      Only return HIGH or CRITICAL severity alerts. If it's a minor delay, ignore it.
-    `;
-
-    const { object } = await generateObject({
-      model: google(AI_MODELS.agents),
-      schema: alertSchema,
-      prompt: prompt,
-    });
+    if (!traceResult.success) throw new Error(traceResult.error);
+    const object = traceResult.data as z.infer<typeof alertSchema>;
 
     // 5. Save generated alerts to the database
     if (object.alerts && object.alerts.length > 0) {
-      console.log(`[ALERT-AGENT] Gemini found ${object.alerts.length} threats! Saving to DB...`);
+      console.log(`[ALERT-AGENT] ADK found ${object.alerts.length} threats! Saving to DB...`);
       
       const insertPromises = object.alerts.map(async (alert) => {
         // Find the node name for the UI message
@@ -134,7 +152,6 @@ export async function GET(request: NextRequest) {
     
     if (isRateLimit) {
       console.warn('[ALERT-AGENT] AI quota exceeded — skipping this scan cycle.');
-      // Return success:true with 0 alerts so the frontend doesn't show an error for background scans
       return NextResponse.json({ success: true, alertsGenerated: 0, message: "Quota limit reached — scan skipped. Will retry next cycle." });
     }
 

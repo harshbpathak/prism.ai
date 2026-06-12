@@ -4,45 +4,22 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { AgentBuilder, BaseTool, AiSdkLlm } from "@iqai/adk";
-import { createGoogleGenerativeAI } from "@ai-sdk/google";
+import { LlmAgent, FunctionTool, Gemini, InMemoryRunner, stringifyContent } from "@google/adk";
+import { withTrace } from '../../../../lib/adk/core/trace';
+import { z } from 'zod';
 import { supabaseServer } from '@/lib/supabase/server';
-import { Redis } from '@upstash/redis';
 import { tavily } from '@tavily/core';
 import { getAIKeyForModule, AI_MODELS } from '@/lib/ai-config';
 
-// Initialize Redis for caching
-const redis = new Redis({
-  url: process.env.UPSTASH_REDIS_URL!,
-  token: process.env.UPSTASH_REDIS_TOKEN!
-});
 
 /**
  * Tavily Strategic Search Tool
  */
-class StrategyIntelligenceTool extends BaseTool {
-  constructor() {
-    super({
-      name: "strategy_intelligence",
-      description: "Search for industry best practices, mitigation strategies, and market resilience trends."
-    });
-  }
-
-  getDeclaration(): any {
-    return {
-      name: this.name,
-      description: this.description,
-      parameters: {
-        type: "object",
-        properties: {
-          query: { type: "string" }
-        },
-        required: ["query"]
-      }
-    };
-  }
-
-  async runAsync(args: { query: string }) {
+const strategyIntelligenceTool = new FunctionTool({
+  name: "strategy_intelligence",
+  description: "Search for industry best practices, mitigation strategies, and market resilience trends.",
+  parameters: z.object({ query: z.string() }),
+  execute: async (args) => {
     if (!process.env.TAVILY_API_KEY) return { error: "Tavily API key missing" };
     const tavilyClient = tavily({ apiKey: process.env.TAVILY_API_KEY });
     const result = await tavilyClient.search(args.query, { 
@@ -51,7 +28,7 @@ class StrategyIntelligenceTool extends BaseTool {
     });
     return result;
   }
-}
+});
 
 /**
  * Production Strategy Agent
@@ -86,41 +63,89 @@ class ProductionStrategyAgent {
         Then, generate a comprehensive strategic mitigation plan.
         
         Structure your response as a valid JSON object with:
-        - immediate: Array of strategies (0-24h)
-        - shortTerm: Array of strategies (1-30d)
-        - longTerm: Array of strategies (30d+)
-        - riskMitigationMetrics: Object with currentRisk, targetRisk, and expectedROI.
+        - immediate: Array of strategies (0-24h). Each must have a 'priority' field ('low', 'medium', 'high', 'critical').
+        - shortTerm: Array of strategies (1-30d). Each must have a 'priority' field ('low', 'medium', 'high', 'critical').
+        - longTerm: Array of strategies (30d+). Each must have a 'priority' field ('low', 'medium', 'high', 'critical').
+        - riskMitigationMetrics: Object with currentRisk (0-100), targetRisk, and expectedROI.
       `;
 
-      // Configure the model using centralized settings
-      const google = createGoogleGenerativeAI({
-        apiKey: getAIKeyForModule("agents"),
+      const traceId = `strategy-${Date.now()}`;
+      const traceResult = await withTrace(traceId, 'StrategyAgent', async () => {
+        const agent = new LlmAgent({
+          name: "strategy_agent",
+          description: "Generates strategic resilience plans",
+          instruction: "You are a senior supply chain risk consultant. Provide highly actionable and data-driven mitigation strategies.",
+          model: new Gemini({ 
+            model: AI_MODELS.agents, 
+            apiKey: getAIKeyForModule("agents")
+          }),
+          tools: [strategyIntelligenceTool]
+        });
+
+        const runner = new InMemoryRunner({ appName: 'strategy', agent });
+        let finalContent = "";
+        for await (const event of runner.runEphemeral({
+          userId: 'system',
+          newMessage: { role: 'user', parts: [{ text: prompt }] }
+        })) {
+          const text = stringifyContent(event);
+          if (text) finalContent += text;
+        }
+        
+        return { success: true, data: finalContent };
       });
 
-      // 4. Execute via ADK
-      const response = await AgentBuilder.create("strategy_agent")
-        .withDescription("Generates strategic resilience plans")
-        .withInstruction("You are a senior supply chain risk consultant. Provide highly actionable and data-driven mitigation strategies.")
-        .withModel(new AiSdkLlm(google(AI_MODELS.agents) as any))
-        .withTools(new StrategyIntelligenceTool())
-        .ask(prompt);
+      if (!traceResult.success) throw new Error(traceResult.error);
+      const response = traceResult.data as string;
 
       // 5. Parse and Store Results
       const jsonMatch = response.match(/\{[\s\S]*\}/);
       const strategyAnalysis = jsonMatch ? JSON.parse(jsonMatch[0]) : { error: "Failed to parse strategy JSON" };
 
-      // Update simulation with result summary
+      // Human-in-the-Loop Checkpoint
+      const isCriticalRisk = strategyAnalysis.riskMitigationMetrics?.currentRisk > 80;
+      const hasCriticalStrategy = [...(strategyAnalysis.immediate || []), ...(strategyAnalysis.shortTerm || [])]
+        .some((s: any) => s.priority === 'critical');
+
+      const requiresApproval = isCriticalRisk || hasCriticalStrategy;
+
+      if (requiresApproval) {
+        console.log(`[STRATEGY-AGENT] 🛑 HITL Gate Triggered! Critical risk detected for simulation ${simulationId}`);
+        // Save as pending_approval
+        await supabaseServer
+          .from('simulations')
+          .update({
+            result_summary: {
+              ...strategyAnalysis,
+              approval_status: 'pending_approval',
+              strategy_timestamp: new Date().toISOString()
+            }
+          })
+          .eq('simulation_id', simulationId);
+
+        return {
+          ...strategyAnalysis,
+          status: 'requires_approval',
+          message: 'Critical risk detected. Human approval required before implementation.'
+        };
+      }
+
+      // Normal flow - Update simulation with result summary
       await supabaseServer
         .from('simulations')
         .update({
           result_summary: {
             ...strategyAnalysis,
+            approval_status: 'auto_approved',
             strategy_timestamp: new Date().toISOString()
           }
         })
         .eq('simulation_id', simulationId);
 
-      return strategyAnalysis;
+      return {
+        ...strategyAnalysis,
+        status: 'completed'
+      };
     } catch (error) {
       console.error('[STRATEGY-AGENT] ❌ Error:', error);
       throw error;
@@ -149,11 +174,20 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url);
-  const simulationId = searchParams.get('simulationId');
-  if (!simulationId) return NextResponse.json({ error: "Missing simulationId" }, { status: 400 });
+  try {
+    const { searchParams } = new URL(request.url);
+    const simulationId = searchParams.get('simulationId');
+    if (!simulationId) return NextResponse.json({ error: "Missing simulationId" }, { status: 400 });
 
-  const agent = new ProductionStrategyAgent();
-  const result = await agent.conductComprehensiveStrategyAnalysis(simulationId);
-  return NextResponse.json({ success: true, data: result });
+    const agent = new ProductionStrategyAgent();
+    const result = await agent.conductComprehensiveStrategyAnalysis(simulationId);
+    return NextResponse.json({ success: true, data: result });
+  } catch (error) {
+    console.error('GET Strategy Error:', error);
+    return NextResponse.json({ 
+      success: false, 
+      error: error instanceof Error ? error.message : "Internal Error",
+      stack: error instanceof Error ? error.stack : undefined
+    }, { status: 500 });
+  }
 }

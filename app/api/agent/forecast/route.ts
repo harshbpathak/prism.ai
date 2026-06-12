@@ -7,8 +7,8 @@ import { supabaseServer } from '../../../../lib/supabase/server';
 import { getAIKeyForModule, AI_MODELS } from '../../../../lib/ai-config';
 import { logger } from '../../../../lib/monitoring';
 
-import { AgentBuilder, BaseTool, AiSdkLlm } from "@iqai/adk";
-import { createGoogleGenerativeAI } from "@ai-sdk/google";
+import { LlmAgent, FunctionTool, Gemini, InMemoryRunner, stringifyContent } from "@google/adk";
+import { withTrace } from '../../../../lib/adk/core/trace';
 
 // Initialize Redis for caching
 const redis = new Redis({
@@ -30,32 +30,16 @@ const ForecastRequestSchema = z.object({
 });
 
 /**
- * Forecast Data Tool for ADK
+ * Forecast Data Tool for ADK (using FunctionTool)
  */
-class ForecastDataTool extends BaseTool {
-  constructor() {
-    super({
-      name: "get_forecast_data",
-      description: "Fetch historical forecasts and supply chain intelligence for a specific supply chain or node."
-    });
-  }
-
-  getDeclaration(): any {
-    return {
-      name: this.name,
-      description: this.description,
-      parameters: {
-        type: "object",
-        properties: {
-          nodeId: { type: "string" },
-          supplyChainId: { type: "string" }
-        },
-        required: ["supplyChainId"]
-      }
-    };
-  }
-
-  async runAsync(args: { nodeId?: string, supplyChainId: string }) {
+const forecastDataTool = new FunctionTool({
+  name: "get_forecast_data",
+  description: "Fetch historical forecasts and supply chain intelligence for a specific supply chain or node.",
+  parameters: z.object({
+    nodeId: z.string().optional(),
+    supplyChainId: z.string()
+  }),
+  execute: async (args) => {
     try {
       const supabase = supabaseServer;
       
@@ -89,43 +73,60 @@ class ForecastDataTool extends BaseTool {
       return { error: "Failed to fetch context data" };
     }
   }
-}
+});
 
 class ProductionForecastAgent {
   async generateForecast(params: any) {
     const traceId = `forecast-adk-${Date.now()}`;
     logger.info({ message: 'Generating forecast via ADK', supplyChainId: params.supplyChainId, traceId });
 
-    try {
-      const prompt = `
-        Generate a supply chain forecast for:
-        Supply Chain ID: ${params.supplyChainId}
-        Node ID: ${params.nodeId || 'All Nodes'}
-        Horizon: ${params.forecastHorizon} days
-        Include Weather: ${params.includeWeather}
-        Include Market Data: ${params.includeMarketData}
-        
-        Use the available tools to fetch context data.
-        Provide a detailed forecast summary, trend analysis, risk factors, and confidence score.
-        Make your insights clear and highly actionable.
-      `;
+    const prompt = `
+      Generate a supply chain forecast for:
+      Supply Chain ID: ${params.supplyChainId}
+      Node ID: ${params.nodeId || 'All Nodes'}
+      Horizon: ${params.forecastHorizon} days
+      Include Weather: ${params.includeWeather}
+      Include Market Data: ${params.includeMarketData}
+      
+      Use the available tools to fetch context data.
+      Provide a detailed forecast summary, trend analysis, risk factors, and confidence score.
+      Make your insights clear and highly actionable.
+    `;
 
-      const google = createGoogleGenerativeAI({
-        apiKey: getAIKeyForModule("agents"),
+    const result = await withTrace(`trace-${traceId}`, 'ForecastAgent', async () => {
+      const agent = new LlmAgent({
+        name: "forecast_agent",
+        description: "High-fidelity forecasting agent",
+        instruction: "You are an expert forecaster. Analyze historic patterns, contextual intelligence, and market variables to predict supply chain trends.",
+        model: new Gemini({ 
+          model: AI_MODELS.agents, 
+          apiKey: getAIKeyForModule('agents') 
+        }),
+        tools: [forecastDataTool]
       });
 
-      const response = await AgentBuilder.create("forecast_agent")
-        .withDescription("High-fidelity forecasting agent")
-        .withInstruction("You are an expert forecaster. Analyze historic patterns, contextual intelligence, and market variables to predict supply chain trends.")
-        .withModel(new AiSdkLlm(google(AI_MODELS.agents) as any))
-        .withTools(new ForecastDataTool())
-        .ask(prompt);
+      const runner = new InMemoryRunner({ appName: 'forecast', agent });
+      
+      let finalContent = "";
+      for await (const event of runner.runEphemeral({
+        userId: 'system',
+        newMessage: { role: 'user', parts: [{ text: prompt }] }
+      })) {
+        const text = stringifyContent(event);
+        if (text) {
+          finalContent += text;
+        }
+      }
 
-      return response;
-    } catch (error) {
-      console.error('[FORECAST-AGENT] ❌ Error:', error);
-      throw error;
+      return { success: true, data: finalContent };
+    });
+
+    if (!result.success) {
+      console.error('[FORECAST-AGENT] ❌ Error:', result.error);
+      throw new Error(result.error);
     }
+
+    return result.data;
   }
 }
 

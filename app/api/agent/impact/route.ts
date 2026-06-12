@@ -4,6 +4,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { generateObject } from 'ai'
 import { createGoogleGenerativeAI, google } from '@ai-sdk/google'
+import { LlmAgent, Gemini, InMemoryRunner, stringifyContent } from "@google/adk"
+import { withTrace } from '../../../../lib/adk/core/trace';
 import { getAIKeyForModule, AI_MODELS } from '@/lib/ai-config'
 import { z } from 'zod'
 import { supabaseServer } from '@/lib/supabase/server'
@@ -981,14 +983,36 @@ Please provide a comprehensive impact assessment following the structured format
       let retries = 2; // max 2 retries (3 total attempts)
       while (retries >= 0) {
         try {
-          const result = await generateObject({
-            model: google(AI_MODELS.agents),
-            schema: SimulationResultsSchema,
-            prompt: analysisPrompt + "\n\nCRITICAL: You must return a COMPLETE JSON object. Do not truncate your response. Be concise if necessary to ensure completeness.",
-            maxTokens: 6000,
-            temperature: 0.2
+          const traceId = `impact-llm-${Date.now()}`;
+          const traceResult = await withTrace(traceId, 'ImpactAgent', async () => {
+            const agent = new LlmAgent({
+              name: "impact_agent",
+              description: "Expert supply chain impact assessment AI",
+              instruction: "You are an expert supply chain impact assessment AI. Follow the schema exactly.",
+              model: new Gemini({ 
+                model: AI_MODELS.agents, 
+                apiKey: getAIKeyForModule("agents")
+              }),
+              outputSchema: SimulationResultsSchema
+            });
+
+            const runner = new InMemoryRunner({ appName: 'impact', agent });
+            let finalContent = "";
+            for await (const event of runner.runEphemeral({
+              userId: 'system',
+              newMessage: { role: 'user', parts: [{ text: analysisPrompt + "\n\nCRITICAL: You must return a COMPLETE JSON object. Do not truncate your response. Be concise if necessary to ensure completeness." }] }
+            })) {
+              const text = stringifyContent(event);
+              if (text) finalContent += text;
+            }
+
+            // Clean markdown JSON wrapper if present
+            const cleanContent = finalContent.replace(/^```json\n/, '').replace(/\n```$/, '');
+            return { success: true, data: JSON.parse(cleanContent) };
           });
-          return result.object;
+
+          if (!traceResult.success) throw new Error(traceResult.error);
+          return traceResult.data;
         } catch (error: any) {
           const errMsg: string = error?.message || '';
           // Quota/rate-limit errors — no point retrying immediately

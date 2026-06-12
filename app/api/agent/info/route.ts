@@ -5,38 +5,21 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { streamText, generateText } from 'ai';
-import { AgentBuilder, BaseTool, AiSdkLlm } from "@iqai/adk";
+import { LlmAgent, FunctionTool, Gemini, InMemoryRunner, stringifyContent } from "@google/adk";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { tavily } from '@tavily/core';
 import { getAIKeyForModule, AI_MODELS } from '@/lib/ai-config';
+import { withTrace } from '../../../../lib/adk/core/trace';
+import { z } from 'zod';
 
 /**
  * Tavily Search Tool for ADK
  */
-class TavilySearchTool extends BaseTool {
-  constructor() {
-    super({
-      name: "tavily_search",
-      description: "Search for real-time supply chain intelligence, weather, and disruptions."
-    });
-  }
-
-  // Simplified declaration to avoid type conflicts
-  getDeclaration(): any {
-    return {
-      name: this.name,
-      description: this.description,
-      parameters: {
-        type: "object",
-        properties: {
-          query: { type: "string" }
-        },
-        required: ["query"]
-      }
-    };
-  }
-
-  async runAsync(args: { query: string }) {
+const tavilySearchTool = new FunctionTool({
+  name: "tavily_search",
+  description: "Search for real-time supply chain intelligence, weather, and disruptions.",
+  parameters: z.object({ query: z.string() }),
+  execute: async (args) => {
     if (!process.env.TAVILY_API_KEY) return { error: "Tavily API key missing" };
     const tavilyClient = tavily({ apiKey: process.env.TAVILY_API_KEY });
     const result = await tavilyClient.search(args.query, { 
@@ -45,16 +28,17 @@ class TavilySearchTool extends BaseTool {
     });
     return result;
   }
-}
+});
 
 /**
  * Production Intelligent Agent
  */
 class ProductionIntelligentAgent {
   async gatherIntelligence(nodeId: string, focusArea: string = 'all') {
+    const traceId = `intel-${Date.now()}`;
     console.log(`[INTEL-AGENT] 🕵️ Gathering intelligence for node: ${nodeId}`);
 
-    try {
+    const result = await withTrace(traceId, 'IntelligenceAgent', async () => {
       const prompt = `
         Gather intelligence for supply chain node: ${nodeId}
         Focus Area: ${focusArea}
@@ -63,27 +47,38 @@ class ProductionIntelligentAgent {
         Provide a detailed summary and risk score (0-100).
       `;
 
-      // Configure the model using centralized settings
-      const google = createGoogleGenerativeAI({
-        apiKey: getAIKeyForModule("agents"),
+      const agent = new LlmAgent({
+        name: "intelligent_agent",
+        description: "Gathers real-time intelligence",
+        instruction: "You are an expert analyst. Use search tools to find the latest data and provide a quantitative risk assessment.",
+        model: new Gemini({ model: AI_MODELS.agents, apiKey: getAIKeyForModule("agents") }),
+        tools: [tavilySearchTool]
       });
 
-      // Execute via ADK
-      const response = await AgentBuilder.create("intelligent_agent")
-        .withDescription("Gathers real-time intelligence")
-        .withInstruction("You are an expert analyst. Use search tools to find the latest data and provide a quantitative risk assessment.")
-        .withModel(new AiSdkLlm(google(AI_MODELS.agents) as any))
-        .withTools(new TavilySearchTool())
-        .ask(prompt);
+      const runner = new InMemoryRunner({ appName: 'intel', agent });
+      
+      let finalContent = "";
+      for await (const event of runner.runEphemeral({
+        userId: 'system',
+        newMessage: { role: 'user', parts: [{ text: prompt }] }
+      })) {
+        const text = stringifyContent(event);
+        if (text) {
+          finalContent += text;
+        }
+      }
 
       return {
-        intelligence: response,
-        timestamp: new Date().toISOString()
+        success: true,
+        data: {
+          intelligence: finalContent,
+          timestamp: new Date().toISOString()
+        }
       };
-    } catch (error) {
-      console.error('[INTEL-AGENT] ❌ Error:', error);
-      throw error;
-    }
+    });
+
+    if (!result.success) throw new Error(result.error);
+    return result.data!;
   }
 }
 
@@ -115,6 +110,8 @@ export async function POST(request: NextRequest) {
       : systemPrompt;
 
     if (body.stream) {
+      // NOTE: We fall back to standard Vercel AI SDK for streaming to the UI to avoid 
+      // breaking the useChat protocol, while ADK is used for full pipeline runs.
       const result = await streamText({
         model: google(AI_MODELS.agents),
         system: systemPrompt,
@@ -122,12 +119,9 @@ export async function POST(request: NextRequest) {
       });
       return result.toDataStreamResponse();
     } else {
-      const result = await generateText({
-        model: google(AI_MODELS.agents),
-        system: systemPrompt,
-        messages: messages || [{ role: 'user', content: promptMessage }],
-      });
-      return NextResponse.json({ success: true, data: result.text });
+      const agent = new ProductionIntelligentAgent();
+      const result = await agent.gatherIntelligence(targetId, focusArea);
+      return NextResponse.json({ success: true, data: result.intelligence });
     }
   } catch (error) {
     console.error('[INTEL-AGENT] ❌ Error:', error);
