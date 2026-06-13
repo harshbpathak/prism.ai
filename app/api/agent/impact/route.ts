@@ -1019,18 +1019,45 @@ Please provide a comprehensive impact assessment matching the strict JSON schema
             }
 
             // Clean markdown JSON wrapper if present
-            const cleanContent = finalContent.replace(/^```json\n/, '').replace(/\n```$/, '');
-            return { success: true, data: JSON.parse(cleanContent) };
+            let cleanContent = finalContent.replace(/^```json\n/, '').replace(/\n```$/, '').trim();
+
+            // Try to extract a valid JSON object even from truncated output
+            let parsed: any = null;
+            try {
+              parsed = JSON.parse(cleanContent);
+            } catch {
+              // Attempt 1: extract outermost { ... } via regex
+              const jsonMatch = cleanContent.match(/\{[\s\S]*\}/);
+              if (jsonMatch) {
+                try { parsed = JSON.parse(jsonMatch[0]); } catch { /* still broken */ }
+              }
+              // Attempt 2: try closing unclosed brackets (truncated stream)
+              if (!parsed) {
+                let repaired = cleanContent;
+                const opens = (repaired.match(/\{/g) || []).length;
+                const closes = (repaired.match(/\}/g) || []).length;
+                for (let i = 0; i < opens - closes; i++) repaired += '}';
+                try { parsed = JSON.parse(repaired); } catch { /* give up */ }
+              }
+            }
+
+            if (!parsed) {
+              console.warn('⚠️ ADK returned un-parseable JSON — falling back to BFS immediately.');
+              return { success: false, error: 'Truncated or invalid JSON from AI' };
+            }
+
+            return { success: true, data: parsed };
           });
 
           if (!traceResult.success) throw new Error(traceResult.error);
           return traceResult.data;
         } catch (error: any) {
           const errMsg: string = error?.message || '';
-          // Quota/rate-limit errors — no point retrying immediately
+          // Quota/rate-limit errors or truncated JSON — no point retrying
           const isRateLimit = errMsg.includes('quota') || errMsg.includes('rate') || errMsg.includes('429') || errMsg.includes('RESOURCE_EXHAUSTED') || errMsg.toLowerCase().includes('overloaded') || errMsg.toLowerCase().includes('temporary');
-          if (isRateLimit) {
-            console.error('❌ AI quota/overload exceeded — using BFS baseline algorithm:', errMsg);
+          const isTruncated = errMsg.includes('Unexpected end of JSON') || errMsg.includes('Truncated or invalid JSON');
+          if (isRateLimit || isTruncated) {
+            console.error(`❌ ${isTruncated ? 'Truncated AI response' : 'AI quota/overload exceeded'} — using BFS baseline algorithm:`, errMsg);
             return this.generateFallbackImpactData(impactPropagation, supplyChainData.nodes, supplyChainData.edges, supplyChainData.simulation);
           }
           retries--;

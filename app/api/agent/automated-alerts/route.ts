@@ -40,6 +40,23 @@ export async function GET(request: NextRequest) {
        return NextResponse.json({ error: "Supply chain nodes not found" }, { status: 404 });
     }
 
+    // Deterministic Cooldown Check (5 minutes)
+    const { data: recentAlerts } = await supabaseServer
+      .from('notifications')
+      .select('created_at')
+      .eq('user_id', userId)
+      .eq('notification_type', 'supply_chain_alert')
+      .order('created_at', { ascending: false })
+      .limit(1);
+
+    if (recentAlerts && recentAlerts.length > 0) {
+      const lastAlertTime = new Date(recentAlerts[0].created_at).getTime();
+      if (Date.now() - lastAlertTime < 5 * 60 * 1000) {
+        console.log('[ALERT-AGENT] Deterministic cooldown active. Skipping redundant scan.');
+        return NextResponse.json({ success: true, alertsGenerated: 0, message: "Cooldown active." });
+      }
+    }
+
     // 2. Extract key locations/keywords to build a targeted search query
     // To avoid massive queries, we'll take top 5 nodes based on risk or just the first few if no risk is defined
     const topNodes = [...nodes].sort((a, b) => (b.risk_level || 0) - (a.risk_level || 0)).slice(0, 5);
@@ -118,11 +135,21 @@ ${JSON.stringify(searchResult.results.map(r => ({ title: r.title, content: r.con
     if (!traceResult.success) throw new Error(traceResult.error);
     const object = traceResult.data as z.infer<typeof alertSchema>;
 
+    // 4.5. Deduplicate against existing alerts by URL
+    const { data: existingAlerts } = await supabaseServer
+      .from('notifications')
+      .select('citations')
+      .eq('user_id', userId)
+      .eq('notification_type', 'supply_chain_alert');
+
+    const existingUrls = new Set((existingAlerts || []).map((n: any) => n.citations?.sources?.[0]?.url).filter(Boolean));
+    const newAlerts = object.alerts?.filter((a) => !existingUrls.has(a.news_url)) || [];
+
     // 5. Save generated alerts to the database
-    if (object.alerts && object.alerts.length > 0) {
-      console.log(`[ALERT-AGENT] ADK found ${object.alerts.length} threats! Saving to DB...`);
+    if (newAlerts.length > 0) {
+      console.log(`[ALERT-AGENT] ADK found ${newAlerts.length} new threats! Saving to DB...`);
       
-      const insertPromises = object.alerts.map(async (alert) => {
+      const insertPromises = newAlerts.map(async (alert) => {
         // Find the node name for the UI message
         const affectedNode = nodes.find(n => n.node_id === alert.node_id);
         const nodeName = affectedNode?.name || 'Unknown Node';
@@ -150,10 +177,10 @@ ${JSON.stringify(searchResult.results.map(r => ({ title: r.title, content: r.con
       });
 
       await Promise.all(insertPromises);
-      return NextResponse.json({ success: true, alertsGenerated: object.alerts.length, data: object.alerts });
+      return NextResponse.json({ success: true, alertsGenerated: newAlerts.length, data: newAlerts });
     }
 
-    return NextResponse.json({ success: true, alertsGenerated: 0, message: "News evaluated; no direct threats matched critical nodes." });
+    return NextResponse.json({ success: true, alertsGenerated: 0, message: "News evaluated; no new/direct threats found or all redundant." });
 
   } catch (error: any) {
     const errMsg = error instanceof Error ? error.message : "Internal Error";

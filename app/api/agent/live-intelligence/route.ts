@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
         const searchQuery = `supply chain disruption logistics news ${region !== 'global' ? region : ''} ${names.join(' OR ')}`.trim();
         // Scale results based on number of nodes in this region, capped at 5 per region to manage context window
         const resultsCount = Math.min(Math.max(names.length, 3), 5);
-        
+
         const result = await tavilyClient.search(searchQuery, { topic: 'news', days: 3, maxResults: resultsCount });
         return `\n--- News for Region: ${region} ---\n` + result.results.map(r => `${r.title}: ${r.content}`).join('\n');
       });
@@ -72,16 +72,6 @@ export async function POST(req: NextRequest) {
     ### Live Intelligence Feed:
     ${searchContext || "No severe live news reported. The global supply chain appears stable."}
 
-    ### Instructions:
-    1. Read the live news feed and perform sentiment analysis on how it impacts each specific node. Pay close attention to geography, corporate names, and industry types.
-    2. Assign a precise \`riskScore\` to EACH node from 0.10 to 0.99:
-       - 0.10 - 0.30: Safe, positive sentiment, or no relevant news.
-       - 0.31 - 0.50: Normal operations, minor background noise.
-       - 0.51 - 0.79: Elevated risk (e.g., impending weather, strikes, geopolitical tension nearby).
-       - 0.80 - 0.99: Critical disruption (e.g., facility on fire, port shut down, immediate bankruptcy).
-    3. Provide a concise \`reason\` explaining the score for each node.
-    4. Set \`disruptionsFound\` to true ONLY if at least one node scores above 0.80.
-    5. Summarize the overall situation in \`description\`.
     `;
 
     const traceId = `live-intel-${Date.now()}`;
@@ -89,7 +79,16 @@ export async function POST(req: NextRequest) {
       const agent = new LlmAgent({
         name: 'live_intelligence_agent',
         description: 'Analyzes live news feeds and assigns risk scores to supply chain nodes.',
-        instruction: 'You are an elite Supply Chain Risk Intelligence Agent. Analyze live global news and assign precise risk scores to supply chain nodes. Always return valid JSON matching the schema.',
+        instruction: `You are an elite Supply Chain Risk Intelligence Agent. Analyze live global news and assign precise risk scores to supply chain nodes.### Instructions:
+            1. Read the live news feed and perform sentiment analysis on how it impacts each specific node. Pay close attention to geography, corporate names, and industry types.
+            2. Assign a precise \`riskScore\` to EACH node from 0.10 to 0.99:
+              - 0.10 - 0.30: Safe, positive sentiment, or no relevant news.
+              - 0.31 - 0.50: Normal operations, minor background noise.
+              - 0.51 - 0.79: Elevated risk (e.g., impending weather, strikes, geopolitical tension nearby).
+              - 0.80 - 0.99: Critical disruption (e.g., facility on fire, port shut down, immediate bankruptcy).
+            3. Provide a concise \`reason\` explaining the score for each node.
+            4. Set \`disruptionsFound\` to true ONLY if at least one node scores above 0.80.
+            5. Summarize the overall situation in \`description\`. Always return valid JSON matching the schema.`,
         model: new Gemini({ model: AI_MODELS.agents, apiKey: getAIKeyForModule('agents') }),
         outputSchema: LiveIntelligenceSchema,
       });
