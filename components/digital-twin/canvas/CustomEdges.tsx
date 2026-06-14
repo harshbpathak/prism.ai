@@ -31,8 +31,28 @@ export const TransportEdge = ({
     targetPosition
   });
 
-  const { disruptedEdges } = useDigitalTwinStore();
+  const { nodes, disruptedEdges, disruptedNodes } = useDigitalTwinStore();
   const isDisrupted = disruptedEdges.includes(id);
+
+  // Check if either connected node is high-risk or disrupted
+  const sourceNode = nodes.find(n => n.id === source);
+  const targetNode = nodes.find(n => n.id === target);
+
+  const isSourceAtRisk = sourceNode && (
+    (sourceNode.data?.riskScore && sourceNode.data.riskScore >= 0.7) || 
+    sourceNode.data?.riskLevel === 'High' || 
+    sourceNode.data?.riskLevel === 'HIGH' || 
+    disruptedNodes.includes(source)
+  );
+
+  const isTargetAtRisk = targetNode && (
+    (targetNode.data?.riskScore && targetNode.data.riskScore >= 0.7) || 
+    targetNode.data?.riskLevel === 'High' || 
+    targetNode.data?.riskLevel === 'HIGH' || 
+    disruptedNodes.includes(target)
+  );
+
+  const isAtRisk = isSourceAtRisk || isTargetAtRisk;
 
   // Get emoji and text for transport mode
   const getTransportInfo = () => {
@@ -57,10 +77,10 @@ export const TransportEdge = ({
         path={edgePath}
         id={id}
         style={{
-          strokeWidth: isDisrupted ? 4 : 2,
-          stroke: isDisrupted ? 'var(--accent-red)' : 'var(--border-default)',
-          strokeDasharray: isDisrupted ? '5,5' : 'none',
-          animation: isDisrupted ? 'dashdraw 1s linear infinite' : 'none',
+          strokeWidth: (isDisrupted || isAtRisk) ? 3 : 2,
+          stroke: (isDisrupted || isAtRisk) ? '#B91C1C' : 'var(--border-default)',
+          strokeDasharray: (isDisrupted || isAtRisk) ? '5,5' : 'none',
+          animation: (isDisrupted || isAtRisk) ? 'dashdraw 1.5s linear infinite' : 'none',
           ...style
         }}
       />

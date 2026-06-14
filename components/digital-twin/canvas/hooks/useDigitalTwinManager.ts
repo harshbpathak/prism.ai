@@ -175,6 +175,9 @@ export function useDigitalTwinManager({
       viewOnly,
     },
     leftPanelProps: {
+      supplyChainName,
+      selectedSupplyChain,
+      setSelectedSupplyChain,
       onAddNode: nodeEdgeActions.handleAddNode,
       onAddNodeAtPosition: nodeEdgeActions.handleAddNodeAtPosition,
       onClearAllNodes: nodeEdgeActions.handleClearAllNodes,

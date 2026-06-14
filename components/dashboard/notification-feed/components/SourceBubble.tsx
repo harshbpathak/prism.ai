@@ -24,6 +24,13 @@ export function SourceBubble({ source }: SourceBubbleProps) {
     async function fetchMetadata() {
       if (!source.url || !isOpen) return
       
+      // Validate URL format before fetching or caching
+      try {
+        new URL(source.url)
+      } catch {
+        return
+      }
+      
       // Check cache first
       if (metadataCache.has(source.url)) {
         const cachedData = metadataCache.get(source.url)
@@ -68,10 +75,19 @@ export function SourceBubble({ source }: SourceBubbleProps) {
 
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation()
-    window.open(source.url, '_blank', 'noopener,noreferrer')
+    if (source.url && (source.url.startsWith('http://') || source.url.startsWith('https://'))) {
+      window.open(source.url, '_blank', 'noopener,noreferrer')
+    }
   }
 
-  const displayTitle = source.title || new URL(source.url).hostname
+  let displayTitle = source.title
+  if (!displayTitle) {
+    try {
+      displayTitle = source.url ? new URL(source.url).hostname : 'Source'
+    } catch {
+      displayTitle = source.url || 'Source'
+    }
+  }
 
   return (
     <TooltipProvider>

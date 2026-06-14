@@ -1,306 +1,233 @@
+"use client";
+
 import { memo } from 'react';
 import { Handle, Position, NodeProps } from 'reactflow';
 import { useDigitalTwinStore } from '@/lib/digitalTwinStore';
+import { Truck, Anchor, Factory, Warehouse, Route, Store } from 'lucide-react';
 
-// Base styles for all nodes
-const baseNodeStyle = {
-  padding: '12px 14px',
-  borderRadius: '8px',
-  width: '165px',
-  boxShadow: 'var(--shadow-sm)',
-  borderWidth: '1px',
-  borderStyle: 'solid',
-  fontFamily: 'inherit',
-  transition: 'all 0.2s ease'
-};
-
-// Node type specific colors with more distinct color schemes
-const nodeTypeColors = {
-  supplier: 'bg-theme-bg-surface border-theme-border-subtle hover:border-theme-blue/40 text-theme-text-primary',
-  factory: 'bg-theme-bg-surface border-theme-border-subtle hover:border-purple-500/40 text-theme-text-primary',
-  port: 'bg-theme-bg-surface border-theme-border-subtle hover:border-cyan-500/40 text-theme-text-primary',
-  warehouse: 'bg-theme-bg-surface border-theme-border-subtle hover:border-theme-amber/40 text-theme-text-primary',
-  distribution: 'bg-theme-bg-surface border-theme-border-subtle hover:border-theme-green/40 text-theme-text-primary',
-  retailer: 'bg-theme-bg-surface border-theme-border-subtle hover:border-theme-red/40 text-theme-text-primary',
-  manufacturer: 'bg-theme-bg-surface border-theme-border-subtle hover:border-orange-500/40 text-theme-text-primary'
-};
-
-// Helper to generate risk class
-const getRiskClass = (riskScore: number) => {
-  if (riskScore >= 0.7) return 'ring-2 ring-theme-red ring-opacity-70 border-theme-red/50';
-  if (riskScore >= 0.4) return 'ring-2 ring-theme-amber ring-opacity-70 border-theme-amber/50';
-  return '';
-};
-
-// Helper to generate selection class with glowing effect
-const getSelectionClass = (selected: boolean) => {
-  return selected 
-    ? 'ring-2 ring-theme-blue ring-opacity-80 shadow-md shadow-theme-blue/20 transform scale-[1.02] transition-all duration-200' 
-    : 'transition-all duration-200';
-};
-
-// Hook to get disruption styling
-const useDisruptionStyle = (id: string) => {
-  const { disruptedNodes } = useDigitalTwinStore();
-  const isRoot = disruptedNodes.length > 0 && disruptedNodes[0] === id;
-  const isDisrupted = disruptedNodes.includes(id);
-  
-  if (isRoot) return 'animate-pulse-border-red z-50';
-  if (isDisrupted) return 'animate-pulse-border-orange z-40';
-  return '';
-};
-
-// Helper to get node style with custom color or fallback
-const getNodeStyle = (data: any, nodeType: keyof typeof nodeTypeColors) => {
-  if (data.nodeColor) {
-    // Use custom color from node data with enhanced styling
-    return {
-      ...baseNodeStyle,
-      backgroundColor: data.nodeColor,
-      color: getContrastColor(data.nodeColor), // Ensure text is readable
-      borderColor: data.nodeColor, // Use the same color for border
-      borderWidth: '2px',
-      borderStyle: 'solid'
-    };
+// Get active node styling and colors
+const nodeTypeConfigs = {
+  supplier: {
+    label: 'SUPPLIER',
+    colorHex: '#2748E8',
+    icon: Truck
+  },
+  port: {
+    label: 'PORT',
+    colorHex: '#1A7F4B',
+    icon: Anchor
+  },
+  factory: {
+    label: 'FACTORY',
+    colorHex: '#B45309',
+    icon: Factory
+  },
+  warehouse: {
+    label: 'WAREHOUSE',
+    colorHex: '#7C3AED',
+    icon: Warehouse
+  },
+  distribution: {
+    label: 'DISTRIBUTION',
+    colorHex: '#B91C1C',
+    icon: Route
+  },
+  retailer: {
+    label: 'RETAILER',
+    colorHex: '#6B7280',
+    icon: Store
+  },
+  manufacturer: {
+    label: 'MANUFACTURER',
+    colorHex: '#B45309',
+    icon: Factory
   }
-  // Fallback to default styles with CSS classes
-  return baseNodeStyle;
 };
 
-// Helper to determine if text should be dark or light based on background color
-const getContrastColor = (hexColor: string): string => {
-  const hex = hexColor.replace('#', '');
-  const r = parseInt(hex.substr(0, 2), 16);
-  const g = parseInt(hex.substr(2, 2), 16);
-  const b = parseInt(hex.substr(4, 2), 16);
-  const brightness = ((r * 299) + (g * 587) + (b * 114)) / 1000;
-  return brightness > 155 ? '#000000' : '#FFFFFF';
-};
+interface BaseNodeProps extends NodeProps {
+  nodeType: keyof typeof nodeTypeConfigs;
+  showLeftHandle?: boolean;
+  showRightHandle?: boolean;
+}
 
-// Supplier Node
-export const SupplierNode = memo(({ id, data, isConnectable, selected }: NodeProps) => {
-  const riskClass = getRiskClass(data.riskScore);
-  const typeClass = data.nodeColor ? '' : nodeTypeColors.supplier;
-  const selectionClass = getSelectionClass(selected);
-  const disruptionClass = useDisruptionStyle(id);
-  const nodeStyle = getNodeStyle(data, 'supplier');
+const BaseNode = memo(({
+  id,
+  data,
+  isConnectable,
+  selected,
+  nodeType,
+  showLeftHandle = true,
+  showRightHandle = true
+}: BaseNodeProps) => {
+  const config = nodeTypeConfigs[nodeType] || nodeTypeConfigs.supplier;
+  const Icon = config.icon;
+
+  const { disruptedNodes } = useDigitalTwinStore();
+  const isDisrupted = disruptedNodes.includes(id);
+
+  // High risk conditions
+  const isHighRisk = data.riskScore >= 0.7 || 
+                     data.riskLevel === 'High' || 
+                     data.riskLevel === 'HIGH' || 
+                     (nodeType === 'retailer' && isDisrupted);
+
+  const isWatch = (data.riskScore >= 0.4 && data.riskScore < 0.7) || 
+                  data.riskLevel === 'Medium' || 
+                  data.riskLevel === 'Watch';
+
+  // Status mapping
+  let statusText = 'Healthy';
+  let statusColorClass = 'bg-[#1A7F4B]';
+
+  if (isDisrupted) {
+    statusText = 'Disrupted';
+    statusColorClass = 'bg-[#B91C1C]';
+  } else if (isHighRisk) {
+    statusText = 'High Risk';
+    statusColorClass = 'bg-[#B91C1C]';
+  } else if (isWatch) {
+    statusText = 'Watch';
+    statusColorClass = 'bg-[#B45309]';
+  } else if (data.status) {
+    statusText = data.status;
+    const lowerStatus = statusText.toLowerCase();
+    if (lowerStatus === 'healthy') statusColorClass = 'bg-[#1A7F4B]';
+    else if (lowerStatus === 'watch') statusColorClass = 'bg-[#B45309]';
+    else if (lowerStatus === 'disrupted' || lowerStatus === 'critical') statusColorClass = 'bg-[#B91C1C]';
+  }
+
+  const borderHex = data.nodeColor || config.colorHex;
+  const borderStyle = {
+    border: `1px solid ${isHighRisk ? '#B91C1C' : borderHex}`
+  };
+
+  const isRootDisruption = disruptedNodes.length > 0 && disruptedNodes[0] === id;
+  const disruptionBorderClass = isRootDisruption 
+    ? 'animate-pulse-border-red border-2' 
+    : isDisrupted 
+      ? 'animate-pulse-border-orange border-2' 
+      : '';
+
+  const selectedClass = selected 
+    ? 'ring-2 ring-[#2748E8] ring-offset-2 dark:ring-offset-zinc-950 scale-[1.02]' 
+    : '';
 
   return (
-    <div 
-      style={nodeStyle} 
-      className={`${data.nodeColor ? 'border-0' : typeClass} ${riskClass} ${selectionClass} ${disruptionClass}`}
+    <div
+      style={borderStyle}
+      className={`relative w-[190px] rounded-xl px-3 py-2.5 transition-all duration-200 shadow-sm text-left ${
+        isHighRisk 
+          ? 'bg-[#FEF2F2] dark:bg-[#2A1515]' 
+          : 'bg-white dark:bg-zinc-900'
+      } ${disruptionBorderClass} ${selectedClass}`}
     >
-      <Handle
-        type="target"
-        position={Position.Left}
-        isConnectable={isConnectable}
-      />
-      <Handle
-        type="source"
-        position={Position.Right}
-        isConnectable={isConnectable}
-      />
-      
-      <div className="text-[0.6rem] font-[700] tracking-[0.05em] text-theme-blue uppercase block mb-1 text-center">SUPPLIER</div>
-      <div className="font-[600] text-theme-text-primary text-[0.82rem] leading-[1.3] text-center">{data.label}</div>
-    </div>
-  );
-});
-
-// Factory Node
-export const FactoryNode = memo(({ id, data, isConnectable, selected }: NodeProps) => {
-  const riskClass = getRiskClass(data.riskScore);
-  const typeClass = data.nodeColor ? '' : nodeTypeColors.factory;
-  const selectionClass = getSelectionClass(selected);
-  const disruptionClass = useDisruptionStyle(id);
-  const nodeStyle = getNodeStyle(data, 'factory');
-
-  return (
-    <div 
-      style={nodeStyle} 
-      className={`${data.nodeColor ? 'border-0' : typeClass} ${riskClass} ${selectionClass} ${disruptionClass}`}
-    >
-      <Handle
-        type="target"
-        position={Position.Left}
-        isConnectable={isConnectable}
-      />
-      <Handle
-        type="source"
-        position={Position.Right}
-        isConnectable={isConnectable}
-      />
-
-      <div className="text-[0.6rem] font-[700] tracking-[0.05em] text-purple-500 dark:text-purple-400 uppercase block mb-1 text-center">FACTORY</div>
-      <div className="font-[600] text-theme-text-primary text-[0.82rem] leading-[1.3] text-center">{data.label}</div>
-    </div>
-  );
-});
-
-// Port Node
-export const PortNode = memo(({ id, data, isConnectable, selected }: NodeProps) => {
-  const riskClass = getRiskClass(data.riskScore);
-  const typeClass = data.nodeColor ? '' : nodeTypeColors.port;
-  const selectionClass = getSelectionClass(selected);
-  const disruptionClass = useDisruptionStyle(id);
-  const nodeStyle = getNodeStyle(data, 'port');
-  
-  return (
-    <div 
-      style={nodeStyle} 
-      className={`${data.nodeColor ? 'border-0' : typeClass} ${riskClass} ${selectionClass} ${disruptionClass}`}
-    >
-      <Handle
-        type="target"
-        position={Position.Left}
-        isConnectable={isConnectable}
-      />
-      <Handle
-        type="source"
-        position={Position.Right}
-        isConnectable={isConnectable}
-      />
-      
-      <div className="text-[0.6rem] font-[700] tracking-[0.05em] text-cyan-500 dark:text-cyan-400 uppercase block mb-1 text-center">PORT</div>
-      <div className="font-[600] text-theme-text-primary text-[0.82rem] leading-[1.3] text-center">{data.label}</div>
-    </div>
-  );
-});
-
-// Warehouse Node
-export const WarehouseNode = memo(({ id, data, isConnectable, selected }: NodeProps) => {
-  const riskClass = getRiskClass(data.riskScore);
-  const typeClass = data.nodeColor ? '' : nodeTypeColors.warehouse;
-  const selectionClass = getSelectionClass(selected);
-  const disruptionClass = useDisruptionStyle(id);
-  const nodeStyle = getNodeStyle(data, 'warehouse');
-  
-  return (
-    <div 
-      style={nodeStyle} 
-      className={`${data.nodeColor ? 'border-0' : typeClass} ${riskClass} ${selectionClass} ${disruptionClass}`}
-    >
-      <Handle
-        type="target"
-        position={Position.Left}
-        isConnectable={isConnectable}
-      />
-      <Handle
-        type="source"
-        position={Position.Right}
-        isConnectable={isConnectable}
-      />
-      
-      <div className="text-[0.6rem] font-[700] tracking-[0.05em] text-theme-amber uppercase block mb-1 text-center">WAREHOUSE</div>
-      <div className="font-[600] text-theme-text-primary text-[0.82rem] leading-[1.3] text-center">{data.label}</div>
-    </div>
-  );
-});
-
-// Distribution Node
-export const DistributionNode = memo(({ id, data, isConnectable, selected }: NodeProps) => {
-  const riskClass = getRiskClass(data.riskScore);
-  const typeClass = data.nodeColor ? '' : nodeTypeColors.distribution;
-  const selectionClass = getSelectionClass(selected);
-  const disruptionClass = useDisruptionStyle(id);
-  const nodeStyle = getNodeStyle(data, 'distribution');
-  
-  return (
-    <div 
-      style={nodeStyle} 
-      className={`${data.nodeColor ? 'border-0' : typeClass} ${riskClass} ${selectionClass} ${disruptionClass}`}
-    >
-      <Handle
-        type="target"
-        position={Position.Left}
-        isConnectable={isConnectable}
-      />
-      <Handle
-        type="source"
-        position={Position.Right}
-        isConnectable={isConnectable}
-      />
-      
-      <div className="text-[0.6rem] font-[700] tracking-[0.05em] text-theme-green uppercase block mb-1 text-center">DISTRIBUTION</div>
-      <div className="font-[600] text-theme-text-primary text-[0.82rem] leading-[1.3] text-center">{data.label}</div>
-    </div>
-  );
-});
-
-// Retailer Node
-export const RetailerNode = memo(({ id, data, isConnectable, selected }: NodeProps) => {
-  const riskClass = getRiskClass(data.riskScore);
-  const typeClass = data.nodeColor ? '' : nodeTypeColors.retailer;
-  const selectionClass = getSelectionClass(selected);
-  const disruptionClass = useDisruptionStyle(id);
-  const nodeStyle = getNodeStyle(data, 'retailer');
-  
-  return (
-    <div 
-      style={nodeStyle} 
-      className={`${data.nodeColor ? 'border-0' : typeClass} ${riskClass} ${selectionClass} ${disruptionClass}`}
-    >
-      <Handle
-        type="target"
-        position={Position.Left}
-        isConnectable={isConnectable}
-      />
-      
-      <div className="text-[0.6rem] font-[700] tracking-[0.05em] text-theme-red uppercase block mb-1 text-center">RETAILER</div>
-      <div className="font-[600] text-theme-text-primary text-[0.82rem] leading-[1.3] text-center">{data.label}</div>
-    </div>
-  );
-});
-
-// Manufacturer / Production Node
-export const ManufacturerNode = memo(({ id, data, isConnectable, selected }: NodeProps) => {
-  const riskClass = getRiskClass(data.riskScore);
-  const typeClass = data.nodeColor ? '' : nodeTypeColors.manufacturer;
-  const selectionClass = getSelectionClass(selected);
-  const disruptionClass = useDisruptionStyle(id);
-  const nodeStyle = getNodeStyle(data, 'manufacturer');
-  
-  return (
-    <div 
-      style={nodeStyle} 
-      className={`${data.nodeColor ? 'border-0' : typeClass} ${riskClass} ${selectionClass} ${disruptionClass}`}
-    >
-      <Handle
-        type="target"
-        position={Position.Left}
-        isConnectable={isConnectable}
-      />
-      <Handle
-        type="source"
-        position={Position.Right}
-        isConnectable={isConnectable}
-      />
-      
-      <div className="text-[0.6rem] font-[700] tracking-[0.05em] text-orange-500 dark:text-orange-400 uppercase block mb-1 text-center">MANUFACTURER</div>
-      <div className="font-[600] text-theme-text-primary text-[0.82rem] leading-[1.3] text-center">{data.label}</div>
-      {data.label?.toLowerCase().includes('india') && (
-        <div className="text-xs text-center mt-1">🇮🇳</div>
+      {showLeftHandle && (
+        <Handle
+          type="target"
+          position={Position.Left}
+          isConnectable={isConnectable}
+          className="!w-2.5 !h-2.5 !bg-theme-border-default hover:!bg-[#2748E8] transition-colors"
+        />
       )}
-    </div>
-  );
-});
+      {showRightHandle && (
+        <Handle
+          type="source"
+          position={Position.Right}
+          isConnectable={isConnectable}
+          className="!w-2.5 !h-2.5 !bg-theme-border-default hover:!bg-[#2748E8] transition-colors"
+        />
+      )}
 
-// Template Group Node
-export const TemplateGroupNode = memo(({ data, selected }: NodeProps) => {
-  const templateSelectionClass = selected ? 'transition-all duration-200' : 'transition-all duration-200';
-  
-  return (
-    <div 
-      className={`template-group ${templateSelectionClass}`}
-      data-label={data.label}
-      title="Double-click to ungroup this template"
-    >
-      <div className="h-full w-full">
-        {/* Space for child nodes */}
+      {/* High Risk Badge */}
+      {isHighRisk && (
+        <span className="absolute top-2.5 right-2 px-1.5 py-0.5 rounded text-[8px] font-bold tracking-wider uppercase bg-[#B91C1C] text-white">
+          HIGH RISK
+        </span>
+      )}
+
+      {/* Top row: icon + type label */}
+      <div className="flex items-center gap-1.5 mb-1.5">
+        <Icon className="w-3.5 h-3.5" style={{ color: isHighRisk ? '#B91C1C' : borderHex }} />
+        <span className="text-[9px] font-bold tracking-wider uppercase" style={{ color: isHighRisk ? '#B91C1C' : borderHex }}>
+          {config.label}
+        </span>
+      </div>
+
+      {/* Middle row: node name */}
+      <div className="font-semibold text-xs leading-tight text-[#18160F] dark:text-[#F0EDE7] mb-2 truncate" title={data.label}>
+        {data.label}
+      </div>
+
+      {/* Bottom row: status dot + status text */}
+      <div className="flex items-center gap-1.5">
+        <span className={`w-1.5 h-1.5 rounded-full ${statusColorClass}`} />
+        <span className="text-[10px] font-medium text-theme-text-secondary">
+          {statusText}
+        </span>
       </div>
     </div>
   );
 });
+
+BaseNode.displayName = 'BaseNode';
+
+// Supplier Node
+export const SupplierNode = memo((props: NodeProps) => (
+  <BaseNode {...props} nodeType="supplier" />
+));
+SupplierNode.displayName = 'SupplierNode';
+
+// Factory Node
+export const FactoryNode = memo((props: NodeProps) => (
+  <BaseNode {...props} nodeType="factory" />
+));
+FactoryNode.displayName = 'FactoryNode';
+
+// Port Node
+export const PortNode = memo((props: NodeProps) => (
+  <BaseNode {...props} nodeType="port" />
+));
+PortNode.displayName = 'PortNode';
+
+// Warehouse Node
+export const WarehouseNode = memo((props: NodeProps) => (
+  <BaseNode {...props} nodeType="warehouse" />
+));
+WarehouseNode.displayName = 'WarehouseNode';
+
+// Distribution Node
+export const DistributionNode = memo((props: NodeProps) => (
+  <BaseNode {...props} nodeType="distribution" />
+));
+DistributionNode.displayName = 'DistributionNode';
+
+// Retailer Node
+export const RetailerNode = memo((props: NodeProps) => (
+  <BaseNode {...props} nodeType="retailer" showRightHandle={false} />
+));
+RetailerNode.displayName = 'RetailerNode';
+
+// Manufacturer / Production Node
+export const ManufacturerNode = memo((props: NodeProps) => (
+  <BaseNode {...props} nodeType="manufacturer" />
+));
+ManufacturerNode.displayName = 'ManufacturerNode';
+
+// Template Group Node
+export const TemplateGroupNode = memo(({ data, selected }: NodeProps) => {
+  const templateSelectionClass = selected ? 'ring-2 ring-blue-500/50' : '';
+  
+  return (
+    <div 
+      className={`template-group h-full w-full border border-dashed border-[#D6CFC4] dark:border-zinc-800 rounded-lg bg-black/[0.02] dark:bg-white/[0.02] ${templateSelectionClass}`}
+      data-label={data.label}
+      title="Double-click to ungroup this template"
+    >
+      <div className="h-full w-full" />
+    </div>
+  );
+});
+TemplateGroupNode.displayName = 'TemplateGroupNode';
 
 export const nodeTypes = {
   supplierNode: SupplierNode,
@@ -309,10 +236,10 @@ export const nodeTypes = {
   warehouseNode: WarehouseNode,
   distributionNode: DistributionNode,
   retailerNode: RetailerNode,
-  customerNode: RetailerNode,  // alias to retailer
+  customerNode: RetailerNode,
   manufacturerNode: ManufacturerNode,
-  productionNode: ManufacturerNode, // Alias for production nodes
-  'supply-chain-node': WarehouseNode, // Alias for generic supply chain nodes
+  productionNode: ManufacturerNode,
+  'supply-chain-node': WarehouseNode,
   supplyChainNode: WarehouseNode,
   genericNode: WarehouseNode,
   group: TemplateGroupNode,

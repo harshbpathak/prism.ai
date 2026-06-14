@@ -4,6 +4,7 @@ import ReactFlow, {
   MiniMap,
   Controls,
   Background,
+  BackgroundVariant,
   Node,
   Edge
 } from 'reactflow';
@@ -33,7 +34,7 @@ export default function DigitalTwinCanvas({ initialNodes, initialEdges, viewOnly
   const [isDragOver, setIsDragOver] = React.useState(false);
   const [contextMenu, setContextMenu] = React.useState<{ id: string; top: number; left: number } | null>(null);
   const [disruptionModalNodeId, setDisruptionModalNodeId] = React.useState<string | null>(null);
-  const { isControlTowerMode, setControlTowerMode } = useDigitalTwinStore();
+  const { isControlTowerMode, setControlTowerMode, disruptedNodes } = useDigitalTwinStore();
   const { simulateDisruption, clearDisruptions } = useDisruptionSimulation();
 
   useCopilotAction({
@@ -232,6 +233,74 @@ export default function DigitalTwinCanvas({ initialNodes, initialEdges, viewOnly
           onDragLeave={onDragLeave}
           onDrop={onDrop}
         >
+          {/* Canvas overlay (top-left): pill badges showing node count + edge count + risk count */}
+          <div className="absolute top-4 left-4 z-10 flex gap-2">
+            <div className="flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-semibold border border-theme-border-subtle bg-white/95 dark:bg-zinc-900/95 backdrop-blur-sm text-theme-text-primary shadow-sm">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#1A7F4B]" />
+              <span>{nodes.filter(n => n.type !== 'group').length} nodes</span>
+            </div>
+            <div className="flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-semibold border border-theme-border-subtle bg-white/95 dark:bg-zinc-900/95 backdrop-blur-sm text-theme-text-primary shadow-sm">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#2748E8]" />
+              <span>{edges.length} edges</span>
+            </div>
+            {(() => {
+              const riskCount = nodes.filter(n => {
+                if (n.type === 'group') return false;
+                const isDisrupted = disruptedNodes.includes(n.id);
+                const isHighRisk = n.data?.riskScore >= 0.7 || 
+                                   n.data?.riskLevel === 'High' || 
+                                   n.data?.riskLevel === 'HIGH' || 
+                                   (n.type === 'retailerNode' && isDisrupted);
+                return isHighRisk || isDisrupted;
+              }).length;
+              
+              return (
+                <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-semibold border backdrop-blur-sm shadow-sm transition-colors duration-200 ${
+                  riskCount > 0 
+                    ? 'border-[#B91C1C] bg-[#FEF2F2]/95 dark:bg-[#2A1515]/95 text-[#B91C1C]'
+                    : 'border-theme-border-subtle bg-white/95 dark:bg-zinc-900/95 text-theme-text-primary'
+                }`}>
+                  <span className={`w-1.5 h-1.5 rounded-full ${riskCount > 0 ? 'bg-[#B91C1C] animate-pulse' : 'bg-zinc-400'}`} />
+                  <span>{riskCount} at risk</span>
+                </div>
+              );
+            })()}
+          </div>
+
+          <style dangerouslySetInnerHTML={{ __html: `
+            .react-flow__controls {
+              box-shadow: none !important;
+              display: flex !important;
+              flex-direction: column !important;
+              gap: 4px !important;
+              left: 16px !important;
+              bottom: 16px !important;
+            }
+            .react-flow__controls-button {
+              background: white !important;
+              color: #18160F !important;
+              border: 1px solid #E5DFD6 !important;
+              border-radius: 6px !important;
+              width: 32px !important;
+              height: 32px !important;
+              display: flex !important;
+              align-items: center !important;
+              justify-content: center !important;
+              box-shadow: 0 1px 2px rgba(0,0,0,0.05) !important;
+            }
+            .dark .react-flow__controls-button {
+              background: #1E1D1B !important;
+              color: #F0EDE7 !important;
+              border-color: #353330 !important;
+            }
+            .react-flow__controls-button:hover {
+              background: #FAFAF7 !important;
+            }
+            .dark .react-flow__controls-button:hover {
+              background: #2A2825 !important;
+            }
+          `}} />
+
           {isDragOver && (
             <div className="absolute inset-0 z-10 pointer-events-none">
               <div className="absolute inset-4 border-2 border-dashed border-theme-blue rounded-theme-lg bg-theme-bg-secondary/90 flex items-center justify-center">
@@ -301,9 +370,9 @@ export default function DigitalTwinCanvas({ initialNodes, initialEdges, viewOnly
             nodesDraggable={!viewOnly && !isControlTowerMode}
             nodesConnectable={!viewOnly && !isControlTowerMode}
           >
-            <Controls className="bg-theme-bg-surface border-theme-border-subtle text-theme-text-primary" />
+            <Controls showInteractive={false} className="bg-theme-bg-surface border-theme-border-subtle text-theme-text-primary" />
             <MiniMap className="bg-theme-bg-surface border-theme-border-subtle" nodeColor="var(--accent-blue)" maskColor="var(--bg-glass)" />
-            <Background variant="dots" gap={24} size={1} color="var(--border-default)" className="bg-theme-bg-primary" />
+            <Background variant={BackgroundVariant.Dots} gap={22} size={1} color="var(--border-default)" className="bg-theme-bg-primary" />
           </ReactFlow>
         </div>
 
