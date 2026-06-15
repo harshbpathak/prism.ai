@@ -1,9 +1,9 @@
 "use client"
 
-import { useEffect, useRef } from "react"
+import { useEffect, useRef, useState } from "react"
 import Link from 'next/link'
 import { Inter } from 'next/font/google'
-import { User } from "lucide-react"
+import { User, Menu, X } from "lucide-react"
 import { Footer } from "@/components/home-page"
 
 const inter = Inter({
@@ -15,6 +15,7 @@ const inter = Inter({
 
 export default function Home() {
   const pageRef = useRef<HTMLDivElement>(null)
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   const smoothScroll = (e: React.MouseEvent<HTMLAnchorElement>, targetId: string) => {
     e.preventDefault();
@@ -271,14 +272,16 @@ export default function Home() {
         .feature-visual { background: #F6F3EE; border: 1px solid #E5DFD6; border-radius: 14px; padding: 24px; min-height: 200px; }
 
         .agent-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; }
-        .agent-card { background: #F6F3EE; border: 1px solid #E5DFD6; border-radius: 8px; padding: 10px 12px; }
-        .agent-dot { width: 8px; height: 8px; border-radius: 50%; margin-bottom: 6px; }
-        .agent-name { font-size: 0.78rem; font-weight: 600; color: #18160F; }
-        .agent-role { font-size: 0.65rem; color: #9C9489; margin-top: 2px; }
+        @media (max-width: 640px) {
+          .agent-grid { grid-template-columns: repeat(2,1fr); }
+        }
+        @media (max-width: 480px) {
+          .agent-grid { grid-template-columns: 1fr; }
+        }
 
-        .canvas-mock { background: #F0EDE6; border-radius: 10px; padding: 16px; position: relative; overflow: hidden; min-height: 180px; }
+        .canvas-mock { background: #F0EDE6; border-radius: 10px; padding: 16px; position: relative; overflow-x: auto; min-height: 180px; -webkit-overflow-scrolling: touch; }
         .canvas-dots { position: absolute; inset: 0; background-image: radial-gradient(circle, #D6CFC4 1px, transparent 1px); background-size: 20px 20px; }
-        .node-row { display: flex; align-items: center; gap: 8px; position: relative; z-index: 1; margin-bottom: 12px; }
+        .node-row { display: flex; align-items: center; gap: 8px; position: relative; z-index: 1; margin-bottom: 12px; min-width: 500px; }
         .node { background: #F6F3EE; border: 1.5px solid #D6CFC4; border-radius: 8px; padding: 6px 12px; }
         .node-label-s { font-size: 0.5rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: #9C9489; }
         .node-name { font-size: 0.7rem; font-weight: 600; color: #18160F; }
@@ -286,7 +289,45 @@ export default function Home() {
 
         .cta-section { background: #F6F3EE; padding: 100px 48px; text-align: center; border-top: 1px solid #E5DFD6; }
         .cta-heading { font-size: 2.8rem; font-weight: 700; letter-spacing: -0.035em; color: #18160F; max-width: 600px; margin: 0 auto 24px; line-height: 1.15; }
+        @media (max-width: 640px) {
+          .cta-heading { font-size: 2rem; }
+          .cta-section { padding: 60px 24px; }
+        }
         .cta-sub { font-size: 0.82rem; color: #9C9489; margin-top: 16px; }
+
+        /* Mobile Nav & Floating Cards Responsive */
+        .nav-toggle { display: none; background: none; border: none; cursor: pointer; color: #18160F; align-items: center; justify-content: center; }
+        @media (max-width: 767px) {
+          .nav-toggle { display: flex; }
+          .nav-right .btn-primary { display: none; }
+          .nav-right { gap: 10px; }
+        }
+
+        .mobile-menu {
+          display: flex; flex-direction: column; gap: 20px;
+          position: fixed; top: 56px; left: 0; right: 0; bottom: 0;
+          background: #F6F3EE; padding: 32px 24px; z-index: 45;
+          border-top: 1px solid #E5DFD6;
+          transform: translateY(-100%); transition: transform 0.3s ease-in-out;
+          opacity: 0; visibility: hidden;
+        }
+        .mobile-menu.open {
+          transform: translateY(0); opacity: 1; visibility: visible;
+        }
+        .mobile-menu a {
+          font-size: 1.2rem; font-weight: 600; color: #18160F; text-decoration: none;
+          padding-bottom: 12px; border-bottom: 1px solid #E5DFD6;
+        }
+        .mobile-menu .btn-mobile {
+          margin-top: 20px;
+          display: inline-flex !important;
+        }
+
+        @media (max-width: 540px) {
+          .floating-card { left: 4px !important; top: -8px !important; }
+          .floating-card2 { right: 4px !important; bottom: -8px !important; }
+          .hero-right { margin-top: 20px; width: 100%; }
+        }
       `}} />
 
       {/* 1. Navbar */}
@@ -302,8 +343,19 @@ export default function Home() {
           <div className="user-circle">
             <User size={14} style={{color: '#5C5850'}} />
           </div>
+          <button className="nav-toggle" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
+            {mobileMenuOpen ? <X size={18} /> : <Menu size={18} />}
+          </button>
         </div>
       </nav>
+
+      {/* Mobile Menu Overlay */}
+      <div className={`mobile-menu ${mobileMenuOpen ? 'open' : ''}`}>
+        <a href="#how-it-works" onClick={(e) => { setMobileMenuOpen(false); smoothScroll(e, 'how-it-works'); }}>How It Works</a>
+        <a href="#analytics" onClick={(e) => { setMobileMenuOpen(false); smoothScroll(e, 'analytics'); }}>Analytics</a>
+        <Link href="/docs" onClick={() => setMobileMenuOpen(false)}>Documentation</Link>
+        <Link href="/dashboard" className="btn-primary btn-mobile" onClick={() => setMobileMenuOpen(false)}>Request Access</Link>
+      </div>
 
       <main style={{ flex: 1 }}>
         {/* 2. Hero Section */}

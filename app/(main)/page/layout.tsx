@@ -1,1 +1,9 @@
-// This layout is now redundant and should be removed to avoid confusion.
+import type React from "react";
+
+export default function RedundantLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return <>{children}</>;
+}

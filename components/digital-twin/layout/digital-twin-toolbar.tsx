@@ -131,10 +131,10 @@ const SimulationToolbar: FC<SimulationToolbarProps> = ({
 
   return (
     <>
-      <div className="w-full h-14 bg-theme-bg-surface border-b border-theme-border-subtle flex items-center justify-between px-6 z-30 flex-shrink-0">
+      <div className="w-full h-auto sm:h-14 py-3 sm:py-0 bg-theme-bg-surface border-b border-theme-border-subtle flex flex-col sm:flex-row items-center justify-between gap-3 px-4 sm:px-6 z-30 flex-shrink-0">
         {/* Left Section: Label + Mode Switcher */}
-        <div className="flex items-center gap-6">
-          <span className="text-sm font-bold text-theme-text-primary tracking-tight uppercase">Digital Twin</span>
+        <div className="flex items-center justify-between sm:justify-start w-full sm:w-auto gap-6">
+          <span className="text-sm font-bold text-theme-text-primary tracking-tight uppercase hidden sm:block">Digital Twin</span>
           
           <div className="flex items-center bg-[#EFEBE3] dark:bg-[#191817] p-1 rounded-full border border-theme-border-subtle">
             <button
@@ -161,10 +161,10 @@ const SimulationToolbar: FC<SimulationToolbarProps> = ({
         </div>
 
         {/* Right Section: Auto-save + Outlined Button */}
-        <div className="flex items-center gap-4">
+        <div className="flex items-center justify-between sm:justify-end w-full sm:w-auto gap-4">
           <div className="flex items-center gap-1.5 text-xs font-semibold text-[#1A7F4B]">
             <Check className="w-4 h-4 stroke-[3px]" />
-            <span>Auto-saved</span>
+            <span className="hidden sm:inline">Auto-saved</span>
           </div>
 
           <button

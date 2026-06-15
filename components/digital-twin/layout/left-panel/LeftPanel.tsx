@@ -151,7 +151,7 @@ const LeftPanel: FC<LeftPanelProps> = ({
 
   return (
     <motion.div 
-      className="h-full border-r border-theme-border-subtle bg-theme-bg-surface flex flex-col z-20 flex-shrink-0"
+      className="h-full border-r border-theme-border-subtle bg-theme-bg-surface flex flex-col z-20 flex-shrink-0 lg:relative absolute left-0 top-0 shadow-lg lg:shadow-none"
       initial={false}
       animate={{ 
         width: isCollapsed ? 48 : 320 

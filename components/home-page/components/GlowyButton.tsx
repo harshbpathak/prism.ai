@@ -8,7 +8,7 @@ import { motion } from "framer-motion";
 interface GlowyButtonProps {
   children: ReactNode;
   href?: string;
-  onClick?: () => void;
+  onClick?: (e: any) => void;
   className?: string;
   variant?: "primary" | "ghost";
 }

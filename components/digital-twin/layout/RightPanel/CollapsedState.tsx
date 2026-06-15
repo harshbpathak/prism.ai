@@ -54,7 +54,7 @@ const CollapsedState: FC<CollapsedStateProps> = ({
 
   return (
     <motion.div 
-      className="h-full border-l border-border bg-card/50 backdrop-blur-sm flex flex-col shadow-sm overflow-hidden dark:bg-slate-950"
+      className="h-full border-l border-border bg-card/50 backdrop-blur-sm flex flex-col shadow-sm overflow-hidden dark:bg-slate-950 lg:relative absolute right-0 top-0 shadow-lg lg:shadow-none z-30"
       variants={panelVariants}
       animate="collapsed"
       initial={false}
