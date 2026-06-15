@@ -1,15 +1,25 @@
-"use client"
+"use client";
+
 import { FC, useState } from 'react';
 import { useQueryState } from 'nuqs';
-import { ChevronDown, ChevronRight, ChevronLeft, Building2, MessageSquare } from 'lucide-react';
-import { DeleteIcon } from '@/components/icons';
-import { BlocksIcon } from '@/components/icons/blocks';
-import { LayoutPanelTopIcon } from '@/components/icons/layout-panel-top';
+import { 
+  ChevronDown, 
+  ChevronRight, 
+  ChevronLeft, 
+  MessageSquare, 
+  GitBranch, 
+  Package, 
+  Anchor, 
+  Factory, 
+  Warehouse, 
+  Route, 
+  Store, 
+  Sparkles, 
+  Trash2 
+} from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
-import { NODE_TYPES, SUPPLY_CHAIN_TEMPLATES } from '@/constants/digital-twin';
+import { SUPPLY_CHAIN_TEMPLATES } from '@/constants/digital-twin';
 import { AIChatPanel } from './assistant';
 
 interface LeftPanelProps {
@@ -46,6 +56,11 @@ interface LeftPanelProps {
   onExportSubgraph?: (nodeIds: string[]) => void;
   pendingAIMessage?: string | null;
   setPendingAIMessage?: (message: string | null) => void;
+  
+  // Custom Selector props
+  supplyChainName?: string;
+  selectedSupplyChain?: string;
+  setSelectedSupplyChain?: (id: string) => void;
 }
 
 const LeftPanel: FC<LeftPanelProps> = ({ 
@@ -53,6 +68,7 @@ const LeftPanel: FC<LeftPanelProps> = ({
   onAddNodeAtPosition,
   onClearAllNodes, 
   onLoadTemplate, 
+  onLoadTemplateAtPosition,
   simulationMode, 
   isCollapsed, 
   setIsCollapsed,
@@ -80,8 +96,12 @@ const LeftPanel: FC<LeftPanelProps> = ({
   onExportSubgraph,
   pendingAIMessage,
   setPendingAIMessage,
+  
+  supplyChainName,
+  selectedSupplyChain,
+  setSelectedSupplyChain,
 }) => {
-  const [expandedSection, setExpandedSection] = useState<string | null>('');
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [chatMode, setChatMode] = useQueryState('chat');
 
   const isImmersiveMode = chatMode === 'immersive';
@@ -90,14 +110,12 @@ const LeftPanel: FC<LeftPanelProps> = ({
     event.dataTransfer.setData('application/reactflow', nodeType);
     event.dataTransfer.effectAllowed = 'move';
     
-    // Add visual feedback during drag
     const target = event.target as HTMLElement;
     target.style.opacity = '0.6';
     target.style.transform = 'scale(0.95)';
   };
 
   const onDragEnd = (event: React.DragEvent) => {
-    // Reset visual feedback after drag
     const target = event.target as HTMLElement;
     target.style.opacity = '1';
     target.style.transform = 'scale(1)';
@@ -107,7 +125,6 @@ const LeftPanel: FC<LeftPanelProps> = ({
     event.dataTransfer.setData('application/reactflow-template', templateId);
     event.dataTransfer.effectAllowed = 'move';
 
-    // Add visual feedback during drag
     const target = event.target as HTMLElement;
     target.style.opacity = '0.6';
     target.style.transform = 'scale(0.95)';
@@ -117,37 +134,24 @@ const LeftPanel: FC<LeftPanelProps> = ({
     setChatMode(immersive ? 'immersive' : null);
   };
 
-  const toggleSection = (section: string) => {
-    setExpandedSection(expandedSection === section ? null : section);
-  };
+  const supplyChainOptions = [
+    { id: 'default-chain', name: 'Default Supply Chain' },
+    { id: 'electronics-chain', name: 'Electronics Supply Chain' },
+    { id: 'automotive-chain', name: 'Automotive Supply Chain' }
+  ];
 
-  const SectionHeader = ({ 
-    title, 
-    isExpanded, 
-    onClick, 
-    icon: Icon 
-  }: { 
-    title: string; 
-    isExpanded: boolean; 
-    onClick: () => void;
-    icon?: any;
-  }) => (
-    <Button
-      variant="ghost"
-      className={`  w-full justify-between p-3 h-auto font-medium text-left hover:bg-muted/50 ${isExpanded ? '' : 'shadow-md'}`}
-      onClick={onClick}
-    >
-      <div className="flex items-center gap-2">
-        {Icon && <Icon className="h-4 w-4" />}
-        <span>{title}</span>
-      </div>
-      {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-    </Button>
-  );
+  const nodeTypesToRender = [
+    { id: 'Supplier', label: 'Supplier', icon: Package, color: 'text-[#2748E8] border-[#2748E8]' },
+    { id: 'Port', label: 'Port', icon: Anchor, color: 'text-[#1A7F4B] border-[#1A7F4B]' },
+    { id: 'Factory', label: 'Factory', icon: Factory, color: 'text-[#B45309] border-[#B45309]' },
+    { id: 'Warehouse', label: 'Warehouse', icon: Warehouse, color: 'text-[#7C3AED] border-[#7C3AED]' },
+    { id: 'Distribution', label: 'Distribution', icon: Route, color: 'text-[#B91C1C] border-[#B91C1C]' },
+    { id: 'Retailer', label: 'Retail', icon: Store, color: 'text-[#6B7280] border-[#6B7280]' }
+  ];
 
   return (
     <motion.div 
-      className="h-full border-r border-border bg-background/50  dark:bg-slate-950 backdrop-blur-sm flex flex-col"
+      className="h-full border-r border-theme-border-subtle bg-theme-bg-surface flex flex-col z-20 flex-shrink-0"
       initial={false}
       animate={{ 
         width: isCollapsed ? 48 : 320 
@@ -167,11 +171,9 @@ const LeftPanel: FC<LeftPanelProps> = ({
             transition={{ duration: 0.2, delay: 0.1 }}
             className="w-full h-full flex flex-col"
           >
-            {/* Spacer to push content to center and button to bottom */}
             <div className="flex-1 flex items-center justify-center">
-              {/* Vertical text when collapsed */}
               <motion.div 
-                className="text-xs text-muted-foreground font-medium select-none"
+                className="text-[10px] text-theme-text-secondary font-[700] uppercase tracking-widest select-none"
                 style={{ 
                   writingMode: 'vertical-rl',
                   textOrientation: 'mixed'
@@ -184,33 +186,31 @@ const LeftPanel: FC<LeftPanelProps> = ({
               </motion.div>
             </div>
             
-            {/* Buttons fixed at bottom */}
-            <div className="mt-auto border-t border-border">
+            <div className="mt-auto border-t border-theme-border-subtle">
               <motion.button
                 onClick={() => {
                   setIsCollapsed(false);
                   handleImmersiveModeChange(true);
                 }}
-                className="w-full p-4 hover:bg-muted transition-colors group flex items-center justify-center"
+                className="w-full p-4 hover:bg-theme-bg-secondary/50 transition-colors group flex items-center justify-center"
                 title="Supply Chain Assistant"
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
               >
-                <MessageSquare className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors" />
+                <MessageSquare className="h-5 w-5 text-theme-text-secondary group-hover:text-theme-blue transition-colors" />
               </motion.button>
               <motion.button
                 onClick={() => setIsCollapsed(false)}
-                className="w-full p-4 hover:bg-muted transition-colors group flex items-center justify-center border-t border-border"
+                className="w-full p-4 hover:bg-theme-bg-secondary/50 transition-colors group flex items-center justify-center border-t border-theme-border-subtle"
                 title="Expand Builder Panel"
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
               >
-                <ChevronRight className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors" />
+                <ChevronRight className="h-5 w-5 text-theme-text-secondary group-hover:text-theme-blue transition-colors" />
               </motion.button>
             </div>
           </motion.div>
         ) : isImmersiveMode ? (
-          // Immersive AI Chat Mode
           <motion.div
             key="immersive"
             initial={{ opacity: 0 }}
@@ -261,266 +261,123 @@ const LeftPanel: FC<LeftPanelProps> = ({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2, delay: 0.1 }}
-            className="w-full flex flex-col h-full"
+            className="w-full flex flex-col h-full bg-theme-bg-surface p-4"
           >
-            {/* Header */}
-            <motion.div 
-              className="p-6 border-b border-border"
-              initial={{ y: -20, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              transition={{ duration: 0.3, delay: 0.2 }}
-            >
-              <h2 className="text-xl font-semibold text-foreground flex items-center gap-2">
-                <Building2 className="h-5 w-5 text-primary" />
-                Supply Chain Builder
-              </h2>
-              <p className="text-sm text-muted-foreground mt-1">
-                Design and configure your supply chain network
-              </p>
-            </motion.div>
-
-            {/* Scrollable Content */}
-            <div className="flex-1 overflow-y-auto">
-              <motion.div 
-                className="p-4 space-y-4"
-                initial={{ y: 20, opacity: 0 }}
-                animate={{ y: 0, opacity: 1 }}
-                transition={{ duration: 0.3, delay: 0.3 }}
+            {/* Supply Chain Selection Dropdown */}
+            <div className="relative mb-5 flex-shrink-0">
+              <label className="text-[10px] font-bold text-theme-text-muted uppercase tracking-wider block mb-1.5">SUPPLY CHAIN</label>
+              <button 
+                onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                className="w-full flex items-center justify-between px-3 py-2 bg-theme-bg-surface border border-theme-border-subtle rounded-lg text-xs font-semibold text-theme-text-primary hover:bg-[#EFEBE3] dark:hover:bg-[#191817] transition-all"
               >
-                
-                {/* Add Nodes Section */}
-                <Card>
-                  <CardContent className="p-0">
-                    <SectionHeader
-                      title="Add Nodes"
-                      isExpanded={expandedSection === 'nodes'}
-                      onClick={() => toggleSection('nodes')}
-                      icon={BlocksIcon}
-                    />
-                    
-                    <AnimatePresence>
-                      {expandedSection === 'nodes' && (
-                        <motion.div 
-                          className="p-4 pt-0 space-y-2 shadow-md"
-                          initial={{ height: 0, opacity: 0 }}
-                          animate={{ height: 'auto', opacity: 1 }}
-                          exit={{ height: 0, opacity: 0 }}
-                          transition={{ duration: 0.2 }}
-                        >
-                          {NODE_TYPES.map((node, index) => {
-                            const IconComponent = node.icon;
-                            return (
-                              <motion.div
-                                key={node.id}
-                                initial={{ opacity: 0, x: -20 }}
-                                animate={{ opacity: 1, x: 0 }}
-                                transition={{ duration: 0.2, delay: index * 0.05 }}
-                              >
-                                <Button
-                                  variant="outline"
-                                  onClick={() => onAddNode(node.id, `New ${node.id}`)}
-                                  onDragStart={(event) => onDragStart(event, node.id)}
-                                  onDragEnd={onDragEnd}
-                                  draggable
-                                  disabled={simulationMode}
-                                  className={`w-full h-auto p-3 justify-start ${node.color} dark:bg-card dark:hover:bg-muted/50 dark:border-border shadow-md transition-all duration-200 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] ${
-                                    simulationMode ? 'opacity-50 cursor-not-allowed' : 'cursor-grab active:cursor-grabbing'
-                                  }`}
-                                >
-                                  <div className="flex items-center gap-3">
-                                    <div className={`p-2 rounded-lg bg-white dark:bg-background ${node.iconColor} border dark:border-2 dark:border-background`}>
-                                      <IconComponent className="h-4 w-4 dark:text-white" />
-                                    </div>
-                                    <div className="text-left">
-                                      <div className="font-medium text-sm dark:text-foreground">{node.id}</div>
-                                      <div className="text-xs text-muted-foreground">{node.description}</div>
-                                    </div>
-                                  </div>
-                                </Button>
-                              </motion.div>
-                            );
-                          })}
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </CardContent>
-                </Card>
-                
-                {/* Templates Section */}
-                <Card>
-                  <CardContent className="p-0">
-                    <SectionHeader
-                      title="Templates"
-                      isExpanded={expandedSection === 'templates'}
-                      onClick={() => toggleSection('templates')}
-                      icon={LayoutPanelTopIcon}
-                    />
-                    
-                    <AnimatePresence>
-                      {expandedSection === 'templates' && (
-                        <motion.div 
-                          className="p-3 pt-0 space-y-1.5 shadow-md"
-                          initial={{ height: 0, opacity: 0 }}
-                          animate={{ height: 'auto', opacity: 1 }}
-                          exit={{ height: 0, opacity: 0 }}
-                          transition={{ duration: 0.2 }}
-                        >
-                          {/* Info about grouping */}
-                          <div className="mb-3 p-2 bg-blue-50 dark:bg-blue-900 rounded-md border border-blue-200 dark:border-blue-800">
-                            <div className="text-xs font-medium text-blue-700 dark:text-blue-300 mb-1">
-                              🔗 Template Grouping
-                            </div>
-                            <div className="text-xs text-blue-600 dark:text-blue-400">
-                              Templates load as grouped units that can be moved together. Double-click to ungroup individual nodes.
-                            </div>
-                          </div>
-
-                          {/* Category Grouping */}
-                          <TooltipProvider>
-                            {['Industry', 'Characteristics', 'Geographic', 'Complexity'].map((category) => {
-                              const categoryTemplates = SUPPLY_CHAIN_TEMPLATES.filter(template => template.category === category);
-                              if (categoryTemplates.length === 0) return null;
-                              
-                              return (
-                                <div key={category} className="space-y-1.5">
-                                  <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide px-1">
-                                    {category}
-                                  </div>
-                                  {categoryTemplates.map((template, index) => (
-                                    <motion.div
-                                      key={template.id}
-                                      initial={{ opacity: 0, x: -20 }}
-                                      animate={{ opacity: 1, x: 0 }}
-                                      transition={{ duration: 0.2, delay: index * 0.03 }}
-                                    >
-                                      <Tooltip>
-                                        <TooltipTrigger asChild>
-                                          <Button
-                                            variant="outline"
-                                            onClick={() => onLoadTemplate?.(template.id)}
-                                            onDragStart={(event) => onTemplateDragStart(event, template.id)}
-                                            onDragEnd={onDragEnd}
-                                            draggable={!simulationMode}
-                                            disabled={simulationMode || !onLoadTemplate}
-                                            className={`w-full h-auto p-2.5 justify-start hover:bg-muted/80 shadow-sm transition-all duration-200 ${
-                                              simulationMode ? 'opacity-50 cursor-not-allowed' : 'cursor-grab active:cursor-grabbing hover:shadow-md'
-                                            }`}
-                                          >
-                                            <div className="flex items-center w-full min-h-[40px]">
-                                              <div className="flex items-center space-x-2.5 flex-1 min-w-0">
-                                                <div className="text-base leading-none flex-shrink-0">
-                                                  {template.icon}
-                                                </div>
-                                                <div className="text-left flex-1 min-w-0">
-                                                  <div className="font-medium text-sm leading-tight dark:text-foreground truncate">
-                                                    {template.name}
-                                                  </div>
-                                                  <div className="text-xs text-muted-foreground leading-tight truncate">
-                                                    {template.description}
-                                                  </div>
-                                                </div>
-                                              </div>
-                                            </div>
-                                          </Button>
-                                        </TooltipTrigger>
-                                        <TooltipContent side="right" className="max-w-xs">
-                                          <div className="space-y-2">
-                                            <div className="font-semibold text-sm">{template.name}</div>
-                                            <div className="text-xs text-muted-foreground">{template.description}</div>
-                                            <div className="flex items-center justify-between text-xs">
-                                              <span className="text-muted-foreground">Nodes:</span>
-                                              <span className="font-medium">{template.nodes}</span>
-                                            </div>
-                                            <div className="flex items-center justify-between text-xs">
-                                              <span className="text-muted-foreground">Complexity:</span>
-                                              <span className={`font-medium ${
-                                                template.complexity === 'High' ? 'text-red-600' :
-                                                template.complexity === 'Medium' ? 'text-yellow-600' : 'text-green-600'
-                                              }`}>
-                                                {template.complexity}
-                                              </span>
-                                            </div>
-                                            <div className="space-y-1">
-                                              <div className="text-xs text-muted-foreground">Features:</div>
-                                              <div className="flex flex-wrap gap-1">
-                                                {template.features.map((feature, idx) => (
-                                                  <span key={idx} className="inline-block px-1.5 py-0.5 bg-muted/60 text-xs rounded-sm">
-                                                    {feature}
-                                                  </span>
-                                                ))}
-                                              </div>
-                                            </div>
-                                          </div>
-                                        </TooltipContent>
-                                      </Tooltip>
-                                    </motion.div>
-                                  ))}
-                                </div>
-                              );
-                            })}
-                          </TooltipProvider>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </CardContent>
-                </Card>
-
-                {/* Build with Assistant Section */}
-                <Card>
-                  <CardContent className="p-4">
-                    <Button
-                      onClick={() => handleImmersiveModeChange(true)}
-                      disabled={simulationMode}
-                      className={`w-full gap-2 bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg transition-all duration-200 ${
-                        simulationMode ? 'opacity-50 cursor-not-allowed' : 'hover:shadow-xl hover:scale-[1.02]'
-                      }`}
+                <div className="flex items-center gap-2">
+                  <GitBranch className="w-3.5 h-3.5 text-theme-text-secondary" />
+                  <span className="truncate">{supplyChainName || 'Select Supply Chain'}</span>
+                </div>
+                <ChevronDown className="w-3.5 h-3.5 text-theme-text-secondary" />
+              </button>
+              {isDropdownOpen && (
+                <div className="absolute top-full left-0 right-0 mt-1.5 bg-theme-bg-surface border border-theme-border-subtle rounded-lg shadow-md py-1 z-50">
+                  {supplyChainOptions.map(option => (
+                    <button
+                      key={option.id}
+                      onClick={() => {
+                        setSelectedSupplyChain?.(option.id);
+                        setIsDropdownOpen(false);
+                      }}
+                      className="w-full text-left px-3 py-2 text-xs font-medium text-theme-text-primary hover:bg-[#EFEBE3] dark:hover:bg-[#191817] transition-colors"
                     >
-                      <MessageSquare className="h-4 w-4" />
-                      Build with Assistant
-                    </Button>
-                    <p className="text-xs text-muted-foreground mt-2 text-center">
-                      Get AI-powered help to design your supply chain
-                    </p>
-                  </CardContent>
-                </Card>
-              </motion.div>
+                      {option.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Scrollable Content (Add Nodes and Templates) */}
+            <div className="flex-1 overflow-y-auto pr-1 space-y-5">
+              {/* Add Nodes Section */}
+              <div>
+                <label className="text-[10px] font-bold text-theme-text-muted uppercase tracking-wider block mb-2">ADD NODES</label>
+                <div className="grid grid-cols-2 gap-2.5">
+                  {nodeTypesToRender.map(node => {
+                    const NodeIcon = node.icon;
+                    return (
+                      <button
+                        key={node.id}
+                        onClick={() => onAddNode(node.id, `New ${node.id}`)}
+                        onDragStart={(event) => onDragStart(event, node.id)}
+                        onDragEnd={onDragEnd}
+                        draggable={!simulationMode}
+                        disabled={simulationMode}
+                        className="flex flex-col items-center justify-center p-3.5 bg-theme-bg-surface border border-theme-border-subtle rounded-xl hover:border-theme-border-default hover:scale-[1.02] active:scale-95 transition-all cursor-grab active:cursor-grabbing shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <NodeIcon className={`w-5.5 h-5.5 mb-2 ${node.color.split(' ')[0]}`} />
+                        <span className="text-xs font-semibold text-theme-text-primary">{node.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Templates Section */}
+              <div>
+                <label className="text-[10px] font-bold text-theme-text-muted uppercase tracking-wider block mb-2">TEMPLATES</label>
+                <div className="space-y-1.5 max-h-[200px] overflow-y-auto pr-1">
+                  {SUPPLY_CHAIN_TEMPLATES.map(template => (
+                    <button
+                      key={template.id}
+                      onClick={() => onLoadTemplate?.(template.id)}
+                      onDragStart={(event) => onTemplateDragStart(event, template.id)}
+                      onDragEnd={onDragEnd}
+                      draggable={!simulationMode}
+                      disabled={simulationMode || !onLoadTemplate}
+                      className="w-full flex items-center justify-between p-2.5 bg-theme-bg-surface border border-theme-border-subtle rounded-lg hover:bg-[#EFEBE3] dark:hover:bg-[#191817] hover:border-theme-border-default transition-all cursor-grab active:cursor-grabbing text-left shadow-sm disabled:opacity-50"
+                    >
+                      <div className="flex items-center gap-2 truncate">
+                        <span className="text-sm">{template.icon}</span>
+                        <span className="text-xs font-semibold text-theme-text-primary truncate">{template.name}</span>
+                      </div>
+                      <span className="text-[10px] font-medium text-theme-text-secondary whitespace-nowrap bg-theme-bg-secondary px-2 py-0.5 rounded-full">
+                        {template.nodes} nodes
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
 
             {/* Actions Footer */}
-            <motion.div 
-              className="p-4 border-t border-border bg-muted/30"
-              initial={{ y: 20, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              transition={{ duration: 0.3, delay: 0.4 }}
-            >
-              <div className="space-y-3">
-                <Button
-                  variant="destructive"
-                  onClick={onClearAllNodes}
-                  disabled={simulationMode}
-                  className={`w-full gap-2 shadow-lg ${
-                    simulationMode ? 'opacity-50 cursor-not-allowed ' : ''
-                  }`}
+            <div className="flex-shrink-0 pt-4 border-t border-theme-border-subtle bg-theme-bg-surface space-y-2.5">
+              <Button
+                onClick={() => handleImmersiveModeChange(true)}
+                disabled={simulationMode}
+                className="w-full bg-black text-white hover:bg-black/90 dark:bg-white dark:text-black dark:hover:bg-white/90 font-semibold text-xs py-2 rounded-lg flex items-center justify-center gap-2 transition-all shadow-sm"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                Build with AI
+              </Button>
+              <Button
+                variant="outline"
+                onClick={onClearAllNodes}
+                disabled={simulationMode}
+                className="w-full border-[#B91C1C]/30 hover:border-[#B91C1C] text-[#B91C1C] hover:bg-[#FEF2F2]/30 dark:hover:bg-[#2A1515]/30 font-semibold text-xs py-2 rounded-lg flex items-center justify-center gap-2 bg-transparent transition-all shadow-none"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                Clear all nodes
+              </Button>
+              
+              <div className="flex justify-center pt-1.5">
+                <button
+                  onClick={() => setIsCollapsed(true)}
+                  className="flex items-center space-x-1.5 px-3 py-1 rounded-theme-md hover:bg-theme-bg-secondary/50 transition-colors group cursor-pointer bg-transparent border-none outline-none focus:outline-none"
+                  title="Collapse Builder Panel"
                 >
-                  <DeleteIcon size={16} className="h-4 w-4" />
-                  Clear All Nodes
-                </Button>
-                
-                {/* Collapse button */}
-                <div className="flex justify-center pt-2">
-                  <motion.button
-                    onClick={() => setIsCollapsed(true)}
-                    className="flex items-center space-x-2 px-4 py-2 rounded-md hover:bg-muted/50 transition-colors group cursor-pointer bg-transparent border-none outline-none focus:outline-none focus:ring-2 focus:ring-primary/20"
-                    title="Collapse Builder Panel"
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                  >
-                    <span className="text-xs text-muted-foreground group-hover:text-primary font-medium pointer-events-auto cursor-pointer select-none">Hide Panel</span>
-                    <ChevronLeft className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors pointer-events-auto cursor-pointer" />
-                  </motion.button>
-                </div>
+                  <span className="text-[11px] text-theme-text-secondary group-hover:text-theme-text-primary font-medium select-none">Hide Panel</span>
+                  <ChevronLeft className="h-3.5 w-3.5 text-theme-text-secondary group-hover:text-theme-text-primary transition-colors" />
+                </button>
               </div>
-            </motion.div>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
@@ -528,4 +385,4 @@ const LeftPanel: FC<LeftPanelProps> = ({
   );
 };
 
-export default LeftPanel; 
+export default LeftPanel;

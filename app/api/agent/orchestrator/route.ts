@@ -1,13 +1,15 @@
+import '@/lib/zod-patch';
 import { NextRequest, NextResponse } from 'next/server';
-import { AgentBuilder, BaseTool, AiSdkLlm } from '@iqai/adk';
-import { createGoogleGenerativeAI } from '@ai-sdk/google';
+import { LlmAgent, FunctionTool, Gemini, InMemoryRunner, stringifyContent } from '@google/adk';
+import { z } from 'zod';
+import { agentAudit } from '@/lib/audit-logger';
 import { getAIKeyForModule, AI_MODELS } from '../../../../lib/ai-config';
+import { withTrace } from '../../../../lib/adk/core/trace';
+import { SessionManager } from '../../../../lib/adk/core/session';
 
-// Import coordination utilities and types
+// Import coordination utilities and types (pure helpers — no @iqai dependency)
 import { agentTools } from '../../coordination/agent-tools';
 import {
-  createCoordinationSession,
-  determineStartingAgent,
   calculateWorkflowEfficiency,
   type OrchestratorRequest,
   type OrchestratorResponse,
@@ -16,70 +18,134 @@ import {
 
 export const maxDuration = 60;
 
-/**
- * Universal ADK Tool wrapper for existing agent tools
- */
-class AdkOrchestratorTool extends BaseTool {
-  toolDef: any;
-  logs: CoordinationStep[];
-  
-  constructor(name: string, description: string, toolDef: any, logs: CoordinationStep[]) {
-    super({ name, description });
-    this.toolDef = toolDef;
-    this.logs = logs;
-  }
-  
-  getDeclaration(): any {
-    return {
-      name: this.name,
-      description: this.description,
-      parameters: {
-        type: "object",
-        properties: {
-          nodeId: { type: "string", description: "Target node ID" },
-          userId: { type: "string" },
-          focusArea: { type: "string" },
-          timeHorizon: { type: "string" },
-          disruptionType: { type: "string" }
-        },
-        required: ["nodeId"]
+// ---------------------------------------------------------------------------
+// FunctionTool wrappers — delegate to the existing coordination tool execute
+// functions while recording CoordinationStep logs for the response payload.
+// ---------------------------------------------------------------------------
+
+function buildTools(coordinationLogs: CoordinationStep[]) {
+  /** Helper: wrap an existing Vercel-AI `tool().execute` in an ADK FunctionTool */
+  function wrap(
+    name: string,
+    description: string,
+    parameters: z.ZodObject<any>,
+    executeFn: (args: any, opts?: any) => Promise<any> | any,
+    agentLabel: string
+  ): FunctionTool {
+    return new FunctionTool({
+      name,
+      description,
+      parameters,
+      execute: async (args: any) => {
+        const start = Date.now();
+        try {
+          const result = await executeFn(args, {} as any);
+          coordinationLogs.push({
+            stepNumber: coordinationLogs.length + 1,
+            agent: agentLabel,
+            action: `Executed ${name}`,
+            reasoning: `Orchestrator invoked ${name} for supply-chain analysis.`,
+            input: args,
+            output: result,
+            processingTime: Date.now() - start,
+          });
+          return typeof result === 'string' ? { text: result } : result;
+        } catch (e: any) {
+          console.error(`[ORCHESTRATOR] Tool ${name} error:`, e);
+          coordinationLogs.push({
+            stepNumber: coordinationLogs.length + 1,
+            agent: agentLabel,
+            action: `Failed ${name}`,
+            reasoning: e.message,
+            input: args,
+            output: { error: e.message },
+            processingTime: Date.now() - start,
+          });
+          return { error: e.message };
+        }
       }
-    };
+    });
   }
-  
-  async runAsync(args: any) {
-    const startTime = Date.now();
-    try {
-      const result = await this.toolDef.execute(args, {} as any);
-      
-      this.logs.push({
-        stepNumber: this.logs.length + 1,
-        agent: this.name.replace('generate', '').replace('gather', '').replace('assess', '').toLowerCase(),
-        action: `Executed ${this.name}`,
-        reasoning: `Analysis required calling ${this.name} for comprehensive supply chain intelligence.`,
-        input: args,
-        output: result,
-        processingTime: Date.now() - startTime,
-      });
-      
-      return JSON.stringify(result);
-    } catch (e: any) {
-      console.error(`Error in ADK tool ${this.name}:`, e);
-      return JSON.stringify({ error: e.message });
-    }
-  }
+
+  return [
+    wrap(
+      'gatherIntelligence',
+      'Gather real-time intelligence and telemetry data from cached database. Use this first to understand the current state of disruptions, weather impacts, and market conditions.',
+      z.object({
+        nodeId: z.string().describe('Target node ID or "all"'),
+        userId: z.string().optional().describe('User ID'),
+        focusArea: z.enum(['weather', 'disruptions', 'market', 'all']).optional().describe('Specific intelligence focus')
+      }),
+      agentTools.gatherIntelligence.execute,
+      'intelligence'
+    ),
+
+    wrap(
+      'generateForecast',
+      'Predictive analytics and trend analysis using cached forecast data. Best after gathering intelligence.',
+      z.object({
+        nodeId: z.string().describe('The supply chain node to forecast for'),
+        userId: z.string().optional().describe('User ID'),
+        timeHorizon: z.enum(['7d', '30d', '90d']).optional().describe('Forecast time horizon')
+      }),
+      agentTools.generateForecast.execute,
+      'forecast'
+    ),
+
+    wrap(
+      'generateScenarios',
+      'What-if modeling and simulation of disruption scenarios. Best after intelligence and/or forecast.',
+      z.object({
+        nodeId: z.string().describe('The node to create scenarios for'),
+        userId: z.string().optional().describe('User ID'),
+        disruptionType: z.enum(['weather', 'geopolitical', 'economic', 'operational', 'all']).optional().describe('Type of disruption to simulate')
+      }),
+      agentTools.generateScenarios.execute,
+      'scenario'
+    ),
+
+    wrap(
+      'assessImpact',
+      'Quantitative risk assessment and impact scoring. Best after scenarios are generated.',
+      z.object({
+        nodeId: z.string().describe('The node to assess impact for'),
+        userId: z.string().optional().describe('User ID'),
+        scenarios: z.any().optional().describe('Scenario data from generateScenarios')
+      }),
+      agentTools.assessImpact.execute,
+      'impact'
+    ),
+
+    wrap(
+      'generateStrategy',
+      'Mitigation planning and strategic action recommendations. Best as the final step after impact assessment.',
+      z.object({
+        nodeId: z.string().describe('The node to generate strategies for'),
+        userId: z.string().optional().describe('User ID'),
+        impactAssessment: z.any().optional().describe('Impact data from assessImpact'),
+        constraints: z.object({
+          budget: z.number().optional(),
+          timeframe: z.string().optional()
+        }).optional().describe('Business constraints')
+      }),
+      agentTools.generateStrategy.execute,
+      'strategy'
+    ),
+  ];
 }
 
-/**
- * Master Orchestrator (ADK Version) - Central coordination service
- */
+// ---------------------------------------------------------------------------
+// POST handler — the single entry-point for multi-agent orchestration
+// ---------------------------------------------------------------------------
+
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
 
   try {
     const body: OrchestratorRequest = await request.json();
-    const { query, nodeId, context, preferences = {} } = body;
+    const { query, nodeId, preferences = {} } = body;
     const userId = (body as any).userId || null;
+    const supplyChainId = body.supplyChainId || undefined;
 
     if (!query) {
       return NextResponse.json({ error: 'Query is required for orchestration' }, { status: 400 });
@@ -87,37 +153,80 @@ export async function POST(request: NextRequest) {
 
     console.log(`[ADK-ORCHESTRATOR] 🎯 Starting multi-agent workflow for query: "${query}"`);
 
+    // ---- Session state (persisted in Supabase) ----------------------------
+    const sessionId = `orch_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+
+    if (supplyChainId) {
+      const initialState = SessionManager.createInitialState({
+        supplyChainId,
+        userId: userId || 'anonymous',
+        query,
+        nodeId: nodeId || undefined
+      });
+      await SessionManager.saveSession(sessionId, initialState);
+    }
+
+    // ---- Build ADK tools --------------------------------------------------
     const coordinationLogs: CoordinationStep[] = [];
+    const tools = buildTools(coordinationLogs);
 
-    // Wrap Vercel tools into ADK tools
-    const intelTool = new AdkOrchestratorTool("gatherIntelligence", "Gather real-time intelligence and telemetry data", agentTools.gatherIntelligence, coordinationLogs);
-    const forecastTool = new AdkOrchestratorTool("generateForecast", "Predictive analytics and trend analysis", agentTools.generateForecast, coordinationLogs);
-    const scenarioTool = new AdkOrchestratorTool("generateScenarios", "What-if modeling and simulation of disruptions", agentTools.generateScenarios, coordinationLogs);
-    const impactTool = new AdkOrchestratorTool("assessImpact", "Quantitative risk assessment and scoring", agentTools.assessImpact, coordinationLogs);
-    const strategyTool = new AdkOrchestratorTool("generateStrategy", "Mitigation planning and strategic actions", agentTools.generateStrategy, coordinationLogs);
-
-    const google = createGoogleGenerativeAI({
-      apiKey: getAIKeyForModule('orchestrator')
-    });
-
+    // ---- Compose prompt ---------------------------------------------------
     const prompt = `Supply Chain Analysis Request: "${query}"
 ${nodeId ? `Target Node ID: ${nodeId}` : 'Target: All nodes in supply chain network'}
 ${userId ? `User ID: ${userId}` : ''}
 
-Coordinate appropriate specialized agent tools to provide comprehensive supply chain intelligence.
-Use your intelligence rules to execute sequential analysis step by step if needed.
+Coordinate the appropriate specialized agent tools to provide comprehensive supply chain intelligence.
+Build insights progressively — gather intelligence first, then forecast, then scenarios, impact, and strategy as needed.
 Format the final analysis as structured markdown with clear headings, bullet points, and actionable business insights.`;
 
-    // Execute via ADK
-    const responseText = await AgentBuilder.create("master_orchestrator")
-      .withDescription("PRISM Master Orchestrator")
-      .withInstruction(`You are the PRISM Master Orchestrator - an advanced AI coordination system. 
-Proactively coordinate specialized tools to forecast, simulate, and mitigate supply chain disruptions.
-Always build insights progressively through multiple tools before providing the final structured markdown response.`)
-      .withModel(new AiSdkLlm(google(AI_MODELS.agents) as any))
-      .withTools(intelTool, forecastTool, scenarioTool, impactTool, strategyTool)
-      .ask(prompt);
+    // ---- Execute via ADK --------------------------------------------------
+    const traceResult = await withTrace(`orchestrator-${sessionId}`, 'MasterOrchestrator', async () => {
+      const orchestrator = new LlmAgent({
+        name: 'master_orchestrator',
+        description: 'PRISM Master Orchestrator — advanced AI coordination system',
+        instruction: `You are the PRISM Master Orchestrator — an advanced AI coordination system for supply chain resilience.
 
+RULES:
+1. Always start by calling gatherIntelligence to understand the current state.
+2. Based on intelligence results, decide whether to call generateForecast, generateScenarios, or both.
+3. After scenarios are generated, call assessImpact with the scenario data.
+4. Finally, call generateStrategy with the impact assessment to create actionable recommendations.
+5. Synthesise ALL tool results into a cohesive, structured markdown report.
+6. Never skip the final synthesis — the user expects a complete analysis.`,
+        model: new Gemini({
+          model: AI_MODELS.agents,
+          apiKey: getAIKeyForModule('orchestrator')
+        }),
+        tools,
+      });
+
+      const runner = new InMemoryRunner({ appName: 'prism-orchestrator', agent: orchestrator });
+
+      let finalContent = '';
+      for await (const event of runner.runEphemeral({
+        userId: userId || 'system',
+        newMessage: { role: 'user', parts: [{ text: prompt }] },
+      })) {
+        const text = stringifyContent(event);
+        if (text) finalContent += text;
+      }
+
+      return { success: true, data: finalContent };
+    });
+
+    if (!traceResult.success) throw new Error(traceResult.error);
+
+    const responseText = traceResult.data as string;
+
+    // ---- Persist final session state --------------------------------------
+    if (supplyChainId) {
+      await SessionManager.saveSession(sessionId, {
+        workflowStage: 'complete',
+        agentsInvoked: [...new Set(coordinationLogs.map(l => l.agent))],
+      }).catch(err => console.warn('[ADK-ORCHESTRATOR] Session save failed (non-fatal):', err));
+    }
+
+    // ---- Build response ---------------------------------------------------
     const totalTime = Date.now() - startTime;
     const agentsInvolved = [...new Set(coordinationLogs.map(log => log.agent))];
     const workflowEfficiency = calculateWorkflowEfficiency(coordinationLogs);
@@ -129,22 +238,27 @@ Always build insights progressively through multiple tools before providing the 
       agentsInvolved,
       processingTime: totalTime,
       workflowEfficiency,
-      finalRecommendations: extractRecommendationsFromText(responseText)
+      finalRecommendations: extractRecommendationsFromText(responseText),
     };
 
-    console.log(`[ADK-ORCHESTRATOR] ✅ Workflow complete in ${totalTime}ms`);
+    console.log(`[ADK-ORCHESTRATOR] ✅ Workflow complete in ${totalTime}ms | Agents: ${agentsInvolved.join(', ')} | Session: ${sessionId}`);
+
+    agentAudit('Orchestrator', userId || 'system').success(`Orchestration complete: "${query.substring(0, 80)}" — ${agentsInvolved.length} agents involved in ${totalTime}ms`, { agentsInvolved, totalSteps: coordinationLogs.length, processingTime: totalTime });
 
     return NextResponse.json(response);
-
   } catch (error: any) {
     console.error(`[ADK-ORCHESTRATOR] ❌ Error:`, error);
-    return NextResponse.json({ 
-      error: 'Failed to orchestrate multi-agent analysis', 
+    return NextResponse.json({
+      error: 'Failed to orchestrate multi-agent analysis',
       details: error.message,
-      processingTime: Date.now() - startTime
+      processingTime: Date.now() - startTime,
     }, { status: 500 });
   }
 }
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
 
 function extractRecommendationsFromText(text: string): string[] {
   const recommendations: string[] = [];
@@ -153,9 +267,9 @@ function extractRecommendationsFromText(text: string): string[] {
   for (const line of lines) {
     const trimmed = line.trim();
     if (
-      trimmed.match(/^\d+\./) || 
-      trimmed.startsWith('•') || 
-      trimmed.startsWith('-') || 
+      trimmed.match(/^\d+\./) ||
+      trimmed.startsWith('•') ||
+      trimmed.startsWith('-') ||
       trimmed.toLowerCase().includes('recommend')
     ) {
       if (trimmed.length > 10 && trimmed.length < 200) {
@@ -167,9 +281,10 @@ function extractRecommendationsFromText(text: string): string[] {
 }
 
 export async function GET() {
-  return NextResponse.json({ 
-    status: 'healthy', 
-    orchestrator: 'operational (ADK-based)',
-    timestamp: new Date().toISOString()
+  return NextResponse.json({
+    status: 'healthy',
+    orchestrator: 'operational (@google/adk)',
+    version: '3.0',
+    timestamp: new Date().toISOString(),
   });
 }

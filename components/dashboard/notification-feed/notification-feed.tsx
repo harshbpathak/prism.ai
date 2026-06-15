@@ -36,6 +36,8 @@ export function NotificationFeed() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [analyzingNews, setAnalyzingNews] = useState(false)
   const [newsAnalysisResults, setNewsAnalysisResults] = useState<any[]>([])
+  const [auditLogs, setAuditLogs] = useState<any[]>([])
+  const [loadingLogs, setLoadingLogs] = useState(false)
   const { toast } = useToast()
 
   // Client-side set of IDs the user has marked read — survives re-fetches from the polling interval
@@ -57,6 +59,11 @@ export function NotificationFeed() {
     }
     fetchUser()
   }, [])
+
+  const supplyChainsRef = useRef(supplyChains);
+  useEffect(() => {
+    supplyChainsRef.current = supplyChains;
+  }, [supplyChains]);
 
   // Fetch notifications
   useEffect(() => {
@@ -118,25 +125,26 @@ export function NotificationFeed() {
         }
     }
 
-    // Autonomous Threat Scanning
+    // Autonomous Threat Scanning — round-robin across ALL supply chains
     let isScanning = false;
+    let scanIndex = 0; // tracks which supply chain to scan next
     const runThreatScans = async () => {
-        if (!user?.id || supplyChains.length === 0 || isScanning) return;
+        const chains = supplyChainsRef.current;
+        if (!user?.id || chains.length === 0 || isScanning) return;
         isScanning = true;
         
         try {
-            // Pick a supply chain to scan (simple round robin or just the first few to avoid API limits)
-            // For now, let's just trigger a scan for the first available supply chain
-            const targetChain = supplyChains[0];
+            // Round-robin: scan next supply chain in sequence
+            const targetChain = chains[scanIndex % chains.length];
+            scanIndex++;
             if (!targetChain) return;
 
-            console.log(`[DASHBOARD-FEED] Triggering autonomous threat scan for SC: ${targetChain.supply_chain_id}`);
+            console.log(`[DASHBOARD-FEED] Triggering autonomous threat scan for SC ${scanIndex}/${chains.length}: ${targetChain.supply_chain_id}`);
             const res = await fetch(`/api/agent/automated-alerts?supplyChainId=${targetChain.supply_chain_id}&userId=${user.id}`);
             const data = await res.json();
             
             if (data.success && data.alertsGenerated > 0) {
-               // A new threat was found and added to the DB.
-               // It will be picked up on the next fetchNotifications cycle or we can fetch immediately.
+               // A new threat was found — pull it into the feed immediately
                fetchNotifications();
             }
         } catch (error) {
@@ -146,19 +154,71 @@ export function NotificationFeed() {
         }
     }
 
+    // Weather Intelligence Scan — checks ALL nodes + transit route midpoints
+    // Runs once on mount then every 3 hours (weather changes slowly)
+    let isWeatherScanning = false;
+    const runWeatherScan = async () => {
+        if (!user?.id || isWeatherScanning) return;
+        isWeatherScanning = true;
+        try {
+            console.log('[DASHBOARD-FEED] Running weather intelligence scan across all transit routes...');
+            const res = await fetch('/api/agent/weather-intelligence', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId: user.id })
+            });
+            const data = await res.json();
+            if (data.success && data.adverseConditions > 0) {
+                console.log(`[DASHBOARD-FEED] ${data.adverseConditions} adverse weather conditions found — refreshing notifications`);
+                fetchNotifications();
+            }
+        } catch (error) {
+            console.error('[DASHBOARD-FEED] Weather scan failed:', error);
+        } finally {
+            isWeatherScanning = false;
+        }
+    }
+
     fetchNotifications()
     fetchLiveNews()
+    runWeatherScan() // Run once immediately on mount
     
-    const dbInterval = setInterval(fetchNotifications, 30000) // Refresh DB every 30s
-    const newsInterval = setInterval(fetchLiveNews, 120000) // Live news every 2 min
-    const scanInterval = setInterval(runThreatScans, 180000) // Deep AI threat scan every 3 min
+    const dbInterval      = setInterval(fetchNotifications, 30000)   // Refresh DB every 30s
+    const newsInterval    = setInterval(fetchLiveNews, 120000)        // Live news every 2 min
+    const scanInterval    = setInterval(runThreatScans, 180000)       // Deep AI threat scan every 3 min
+    const weatherInterval = setInterval(runWeatherScan, 3 * 60 * 60 * 1000) // Weather scan every 3 hours
 
     return () => {
         clearInterval(dbInterval)
         clearInterval(newsInterval)
         clearInterval(scanInterval)
+        clearInterval(weatherInterval)
     }
-  }, [user, supplyChains, toast])
+  }, [user?.id]) // Removed toast and supplyChains to prevent infinite remounting of intervals
+
+  // Fetch Audit Logs
+  useEffect(() => {
+    if (!user?.id || activeMainTab !== "activity") return;
+    
+    async function fetchAuditLogs() {
+      try {
+        setLoadingLogs(true)
+        const res = await fetch(`/api/audit-logs?userId=${user.id}`)
+        if (res.ok) {
+          const data = await res.json()
+          setAuditLogs(data.logs || [])
+        }
+      } catch (error) {
+        console.error('Failed to fetch audit logs:', error)
+      } finally {
+        setLoadingLogs(false)
+      }
+    }
+    
+    fetchAuditLogs()
+    const interval = setInterval(fetchAuditLogs, 30000) // refresh every 30s
+    return () => clearInterval(interval)
+  }, [user?.id, activeMainTab])
 
   const handleMarkAsRead = async (id: string) => {
     // Optimistically mark read in UI immediately
@@ -348,12 +408,16 @@ export function NotificationFeed() {
   }
 
   const renderNotificationList = () => {
+    const filteredNotifications = notifications.filter(n => 
+      activeMainTab === "alerts" ? n.notification_type !== 'live_news_alert' : n.notification_type === 'live_news_alert'
+    )
+
     const displayNotifications = showMore 
-      ? notifications 
-      : notifications.slice(0, INITIAL_DISPLAY_COUNT)
+      ? filteredNotifications 
+      : filteredNotifications.slice(0, INITIAL_DISPLAY_COUNT)
     
-    const hasMoreNotifications = notifications.length > INITIAL_DISPLAY_COUNT
-    const unreadCount = notifications.filter(n => !n.read_status).length
+    const hasMoreNotifications = filteredNotifications.length > INITIAL_DISPLAY_COUNT
+    const unreadCount = filteredNotifications.filter(n => !n.read_status).length
 
     if (loading) {
       return (
@@ -377,9 +441,11 @@ export function NotificationFeed() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <h3 className="font-medium text-gray-900 dark:text-gray-100">Notifications</h3>
+            <h3 className="font-semibold text-foreground">
+              {activeMainTab === "alerts" ? "Threat Alerts" : "Live News"}
+            </h3>
             {unreadCount > 0 && (
-              <Badge variant="secondary" className="bg-black text-white dark:bg-white dark:text-black border-none text-xs">
+              <Badge variant="secondary" className="bg-primary text-primary-foreground border-none text-xs rounded-full">
                 {unreadCount} new
               </Badge>
             )}
@@ -418,24 +484,31 @@ export function NotificationFeed() {
 
                 return (
                   <motion.div
-                    key={notification.notification_id}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, height: 0 }}
-                    transition={{ delay: index * 0.05 }}
+                    key={notification.notification_id || index}
                     className={cn(
-                      "rounded-lg border p-4 transition-all duration-200 hover:shadow-md cursor-pointer",
+                      "relative pl-7 py-4 pr-5 border rounded-theme-md transition-all duration-200 cursor-pointer flex flex-col mb-2",
                       isRead 
-                        ? "bg-white dark:bg-black border-gray-200 dark:border-gray-800 opacity-80" 
-                        : "bg-gray-50 dark:bg-gray-900 border-black dark:border-white shadow-sm"
+                        ? "bg-theme-bg-surface/50 border-theme-border-subtle/50 opacity-60" 
+                        : "bg-theme-bg-surface border-theme-border-subtle hover:bg-theme-bg-secondary hover:border-theme-border-default hover:shadow-md"
                     )}
                     onClick={() => handleViewDetails(notification)}
                   >
+                    {/* Left accent bar */}
+                    <div className={cn(
+                      "absolute left-0 top-0 bottom-0 w-[3px]",
+                      isRead ? "bg-theme-text-muted/30" : (
+                        notification.severity === 'HIGH' 
+                          ? "bg-theme-red" 
+                          : notification.severity === 'MEDIUM'
+                          ? "bg-theme-amber"
+                          : "bg-theme-blue"
+                      )
+                    )} />
                     {/* Main content */}
                     <div className="flex items-start gap-4 mb-3">
                       {/* Icon */}
                       <div className="flex-shrink-0">
-                        <div className="rounded-full p-2 bg-gray-100 dark:bg-gray-800">
+                        <div className="rounded-full p-2 bg-theme-bg-secondary">
                           {renderNotificationIcon(notification)}
                         </div>
                       </div>
@@ -444,36 +517,37 @@ export function NotificationFeed() {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start justify-between mb-2">
                           <div className="flex items-center gap-2">
-                            <p className="font-medium text-gray-900 dark:text-gray-100 text-base leading-relaxed">{notification.title}</p>
+                            <p className="font-[600] text-theme-text-primary text-[0.88rem] leading-[1.4]">{notification.title}</p>
                             {/* Visual indicator for Live News */}
                             {notification.notification_type === 'live_news_alert' && (
-                                <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded border bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800 text-[10px] uppercase font-bold tracking-wider w-fit shrink-0">
-                                    <div className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-pulse"></div>
+                                <div className="inline-flex items-center gap-1.5 px-[8px] py-[2px] rounded-theme-pill bg-theme-blue-soft border border-theme-blue/20 text-theme-blue text-[0.65rem] font-[700] tracking-[0.05em] uppercase w-fit shrink-0">
+                                    <div className="w-1.5 h-1.5 rounded-full bg-theme-blue animate-pulse"></div>
                                     Live News
                                 </div>
                             )}
                             {!isRead && (
-                              <span className="h-2 w-2 rounded-full bg-black dark:bg-white flex-shrink-0 mt-1"></span>
+                              <span className="h-2 w-2 rounded-full bg-theme-blue flex-shrink-0 mt-1"></span>
                             )}
                           </div>
                           
                           <div className="flex items-center gap-3 flex-shrink-0">
                             {notification.severity && (
-                              <Badge variant="outline" className={`text-xs px-2 py-1 font-medium ${
+                              <span className={cn(
+                                "text-[0.65rem] font-[700] tracking-[0.05em] py-[2px] px-[8px] rounded-theme-pill border border-transparent",
                                 notification.severity === 'HIGH' 
-                                  ? 'bg-black dark:bg-white text-white dark:text-black border-transparent' 
+                                  ? 'bg-theme-red/10 text-theme-red' 
                                   : notification.severity === 'MEDIUM'
-                                  ? 'bg-gray-200 dark:bg-gray-800 text-black dark:text-white border-transparent'
-                                  : 'bg-white dark:bg-black text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-800'
-                              }`}>
+                                  ? 'bg-theme-bg-secondary text-theme-text-secondary'
+                                  : 'bg-theme-blue-soft text-theme-blue'
+                              )}>
                                 {notification.severity}
-                              </Badge>
+                              </span>
                             )}
                             {!isRead && (
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                className="h-6 w-6 p-0 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800"
+                                className="h-6 w-6 p-0 rounded-full hover:bg-theme-bg-secondary text-theme-text-secondary"
                                 onClick={(e) => {
                                   e.stopPropagation()
                                   handleMarkAsRead(notification.notification_id)
@@ -486,14 +560,14 @@ export function NotificationFeed() {
                         </div>
                         
                         {truncatedMessage && (
-                          <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed mb-3 line-clamp-2">{truncatedMessage}</p>
+                          <p className="text-sm text-theme-text-secondary leading-relaxed mb-3 line-clamp-2">{truncatedMessage}</p>
                         )}
 
                         {/* Simplified metadata row */}
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
                             {getTypeIcon(type)}
-                            <p className="text-xs text-gray-500 dark:text-gray-400">
+                            <p className="text-xs text-theme-text-muted">
                               {notification.created_at && safeDateFormat(notification.created_at) || "Unknown time"}
                             </p>
                             
@@ -506,7 +580,7 @@ export function NotificationFeed() {
                               
                               if (sourceCount > 0 || entityCount > 0 || relationshipCount > 0) {
                                 return (
-                                  <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
+                                  <div className="flex items-center gap-1 text-xs text-theme-text-muted">
                                     <span>•</span>
                                     {sourceCount > 0 && <span>{sourceCount} sources</span>}
                                     {entityCount > 0 && sourceCount > 0 && <span>•</span>}
@@ -520,18 +594,16 @@ export function NotificationFeed() {
                             })()}
                           </div>
                           
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 px-2 text-xs text-black dark:text-white hover:bg-gray-100 dark:hover:bg-gray-800 underline underline-offset-2"
+                          <button
+                            className="h-7 px-2 text-[0.78rem] text-theme-blue font-[500] hover:text-theme-blue/80 transition-colors flex items-center gap-1 bg-transparent border-none cursor-pointer"
                             onClick={(e) => {
                               e.stopPropagation()
                               handleViewDetails(notification)
                             }}
                           >
                             View Details
-                            <ArrowRight className="h-3 w-3 ml-1" />
-                          </Button>
+                            <ArrowRight className="h-3 w-3" />
+                          </button>
                         </div>
                       </div>
                     </div>
@@ -541,7 +613,7 @@ export function NotificationFeed() {
                       const citations = notification.citations as NotificationCitations | null
                       if (citations?.sources && citations.sources.length > 0) {
                         return (
-                          <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-800">
+                          <div className="mt-3 pt-3 border-t border-theme-border-subtle">
                             <div className="flex flex-wrap gap-2">
                               {/* Show first 2 sources */}
                               {citations.sources.slice(0, 2).map((source, idx) => (
@@ -549,7 +621,7 @@ export function NotificationFeed() {
                               ))}
                               {/* Show count if more than 2 sources */}
                               {citations.sources.length > 2 && (
-                                <div className="inline-flex items-center px-2 py-1 text-xs bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 rounded-md border border-gray-200 dark:border-gray-700">
+                                <div className="inline-flex items-center px-[8px] py-[3px] rounded-theme-sm border border-theme-border-subtle bg-theme-bg-secondary text-[0.72rem] text-theme-text-secondary">
                                   +{citations.sources.length - 2} more sources
                                 </div>
                               )}
@@ -580,7 +652,7 @@ export function NotificationFeed() {
               ) : (
                 <>
                   <Plus className="h-4 w-4" />
-                  <span>Show {notifications.length - INITIAL_DISPLAY_COUNT} More</span>
+                  <span>Show {filteredNotifications.length - INITIAL_DISPLAY_COUNT} More</span>
                 </>
               )}
             </Button>
@@ -590,22 +662,93 @@ export function NotificationFeed() {
     )
   }
 
+  const renderAuditLogs = () => {
+    if (loadingLogs && auditLogs.length === 0) {
+      return (
+        <div className="space-y-4">
+          {[...Array(5)].map((_, i) => (
+            <div key={i} className="flex items-start gap-3 rounded-lg border p-4 bg-white dark:bg-gray-900 shadow-sm animate-pulse">
+              <div className="w-10 h-10 bg-gray-200 dark:bg-gray-700 rounded-full"></div>
+              <div className="flex-1 space-y-2">
+                <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4"></div>
+                <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-full"></div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )
+    }
+
+    if (auditLogs.length === 0) {
+      return (
+        <div className="flex flex-col items-center justify-center py-12 text-center text-gray-500">
+          <Info className="h-12 w-12 mb-3 opacity-20" />
+          <p className="text-sm">No recent activity found.</p>
+        </div>
+      )
+    }
+
+    return (
+      <div className="relative border-l border-theme-border-subtle ml-4 space-y-6 pb-4">
+        {auditLogs.map((log) => {
+          const isError = log.details?.status === 'error';
+          const isSuccess = log.details?.status === 'success';
+          const isStart = log.details?.status === 'started';
+          
+          return (
+            <div key={log.log_id} className="relative pl-6">
+              {/* Timeline Dot */}
+              <div className={cn(
+                "absolute -left-[5px] top-1.5 w-2.5 h-2.5 rounded-full border-2 border-white dark:border-gray-900",
+                isError ? "bg-theme-red" : isStart ? "bg-theme-blue animate-pulse" : "bg-theme-green"
+              )} />
+              
+              <div className="bg-theme-bg-surface border border-theme-border-subtle rounded-theme-md p-3 hover:shadow-sm transition-shadow">
+                <div className="flex justify-between items-start mb-1">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-theme-text-muted">
+                    {log.action.replace(/_/g, ' ')}
+                  </span>
+                  <span className="text-[0.65rem] text-theme-text-muted">
+                    {safeDateFormat(log.timestamp)}
+                  </span>
+                </div>
+                <p className={cn(
+                  "text-sm", 
+                  isError ? "text-theme-red font-medium" : "text-theme-text-primary"
+                )}>
+                  {log.details?.summary || 'Activity recorded'}
+                </p>
+                {log.details?.agent && (
+                  <div className="mt-2 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-theme-bg-secondary text-[0.65rem] text-theme-text-secondary border border-theme-border-subtle">
+                    <Factory className="h-3 w-3" />
+                    {log.details.agent}
+                  </div>
+                )}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    )
+  }
+
   return (
     <div className="p-4">
       {/* Main Tab Navigation */}
       <div className="flex items-center justify-between mb-6">
-        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-1 flex space-x-1 w-fit">
+        <div className="bg-theme-bg-secondary border border-theme-border-subtle rounded-theme-pill p-[3px] flex space-x-1 w-fit">
           {[
-            { id: "alerts" as MainTab, label: "Real-Time Alerts" },
+            { id: "alerts" as MainTab, label: "Threat Alerts" },
+            { id: "news" as MainTab, label: "Live News" },
             { id: "activity" as MainTab, label: "Recent Activity" },
           ].map(tab => (
             <motion.button
               key={tab.id}
               onClick={() => setActiveMainTab(tab.id)}
-              className={`relative px-4 py-2 rounded-md font-medium transition-colors duration-200 ${
+              className={`relative px-[16px] py-[6px] rounded-theme-pill text-[0.82rem] font-[600] transition-colors duration-200 ${
                 activeMainTab === tab.id
-                  ? "bg-black text-white dark:bg-white dark:text-black"
-                  : "text-gray-600 dark:text-gray-400 hover:text-black dark:hover:text-white"
+                  ? "bg-theme-text-primary text-theme-bg-primary"
+                  : "text-theme-text-muted hover:text-theme-text-primary"
               }`}
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
@@ -614,19 +757,20 @@ export function NotificationFeed() {
             </motion.button>
           ))}
         </div>
-        <Button variant="link" asChild>
-          <Link href="/news-room" className="flex items-center text-sm">
-            View Real-Time Alerts
-            <ArrowRight className="h-4 w-4 ml-1" />
-          </Link>
-        </Button>
+        <Link 
+          href="/news-room" 
+          className="text-[0.82rem] text-theme-blue font-[500] hover:text-theme-blue/80 hover:underline underline-offset-4 transition-colors flex items-center gap-1"
+        >
+          View Real-Time Alerts
+          <ArrowRight className="h-3.5 w-3.5" />
+        </Link>
       </div>
 
       {/* Tab Content */}
       <AnimatePresence mode="wait">
-        {activeMainTab === "alerts" && (
+        {(activeMainTab === "alerts" || activeMainTab === "news") && (
           <motion.div
-            key="alerts"
+            key={activeMainTab}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
@@ -648,49 +792,52 @@ export function NotificationFeed() {
               duration: 0.3,
               ease: "easeInOut"
             }}
+            className="h-full pr-2"
           >
-            <div className="flex flex-col items-center justify-center py-12 space-y-6">
-              <Lottie 
-                animationData={comingSoonAnimation} 
-                loop={true}
-                autoplay={true}
-                style={{ width: 300, height: 300 }}
-              />
-              <div className="text-center space-y-2">
-                <p className="text-sm text-gray-600 dark:text-gray-400 max-w-md">
-                  We're working hard to bring you detailed activity tracking. 
-                  Stay tuned for updates on your supply chain activities.
-                </p>
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="font-semibold text-foreground">Audit & System Activity</h3>
+              <div className="flex items-center gap-4 text-[0.7rem] text-theme-text-muted font-medium bg-theme-bg-surface px-3 py-1.5 rounded-full border border-theme-border-subtle">
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-theme-blue animate-pulse"></span> Started
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-theme-green"></span> Completed
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-theme-red"></span> Error
+                </span>
               </div>
             </div>
+            {renderAuditLogs()}
           </motion.div>
         )}
       </AnimatePresence>
 
       {/* Notification Details Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto bg-theme-bg-glass backdrop-blur-[16px] saturate-[180%] border border-theme-border-subtle/50 shadow-lg">
           {selectedNotification && (
             <>
               <DialogHeader>
                 <div className="flex items-center gap-2">
-                  <div className="rounded-full p-1.5 bg-gray-100 dark:bg-gray-800">
+                  <div className="rounded-full p-1.5 bg-theme-bg-secondary">
                     {renderNotificationIcon(selectedNotification)}
                   </div>
-                  <DialogTitle className="text-lg font-semibold">{selectedNotification.title}</DialogTitle>
+                  <DialogTitle className="text-lg font-semibold text-theme-text-primary">{selectedNotification.title}</DialogTitle>
                   {selectedNotification.severity && (
-                    <Badge variant="outline" className={`text-xs px-2 py-0.5 ${
+                    <span className={cn(
+                      "text-[0.65rem] font-[700] tracking-[0.05em] py-[2px] px-[8px] rounded-theme-pill border border-transparent",
                       selectedNotification.severity === 'HIGH' 
-                        ? 'bg-black dark:bg-white text-white dark:text-black border-transparent' 
+                        ? 'bg-theme-red/10 text-theme-red' 
                         : selectedNotification.severity === 'MEDIUM'
-                        ? 'bg-gray-200 dark:bg-gray-800 text-black dark:text-white border-transparent'
-                        : 'bg-white dark:bg-black text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-800'
-                    }`}>
+                        ? 'bg-theme-bg-secondary text-theme-text-secondary'
+                        : 'bg-theme-blue-soft text-theme-blue'
+                    )}>
                       {selectedNotification.severity}
-                    </Badge>
+                    </span>
                   )}
                 </div>
-                <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                <div className="flex items-center gap-2 text-sm text-theme-text-muted">
                   {getTypeIcon(getNotificationType(selectedNotification))}
                   <span>{selectedNotification.created_at && safeDateFormat(selectedNotification.created_at) || "Unknown time"}</span>
                   <span>•</span>
@@ -702,9 +849,9 @@ export function NotificationFeed() {
                 {/* Full Message */}
                 {selectedNotification.message && (
                   <div>
-                    <h4 className="font-medium text-gray-900 dark:text-gray-100 mb-2">Details</h4>
-                    <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
-                      <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-wrap">
+                    <h4 className="font-[600] text-theme-text-primary mb-2">Details</h4>
+                    <div className="bg-theme-bg-secondary/40 border border-theme-border-subtle rounded-theme-md p-4">
+                      <p className="text-sm text-theme-text-secondary leading-relaxed whitespace-pre-wrap">
                         {selectedNotification.message}
                       </p>
                     </div>

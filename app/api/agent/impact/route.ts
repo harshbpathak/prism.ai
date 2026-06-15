@@ -1,41 +1,21 @@
+import '@/lib/zod-patch';
 // Enhanced Supply Chain Impact Assessment Agent V2.0
 // Production-grade AI agent for comprehensive impact analysis with advanced ML algorithms
 
 import { NextRequest, NextResponse } from 'next/server'
 import { generateObject } from 'ai'
 import { createGoogleGenerativeAI, google } from '@ai-sdk/google'
+import { LlmAgent, Gemini, InMemoryRunner, stringifyContent } from "@google/adk"
+import { withTrace } from '../../../../lib/adk/core/trace';
+import { createHash } from 'crypto'
 import { getAIKeyForModule, AI_MODELS } from '@/lib/ai-config'
 import { z } from 'zod'
 import { supabaseServer } from '@/lib/supabase/server'
-import { Redis } from '@upstash/redis'
+import { agentAudit } from '@/lib/audit-logger';
+import { getRedisClient } from '@/lib/clients/redis';
 import type { Simulation, ImpactResult, Node, Edge, SupplyChain } from '@/lib/types/database'
 import { createMem0, addMemories, retrieveMemories, getMemories } from '@mem0/vercel-ai-provider'
 
-// Initialize Redis for advanced caching with TTL strategies
-const redis = new Redis({
-  url: process.env.UPSTASH_REDIS_URL!,
-  token: process.env.UPSTASH_REDIS_TOKEN!
-})
-
-// Initialize Mem0 with proper configuration following latest docs
-const mem0 = createMem0({
-  provider: 'google',
-  mem0ApiKey: process.env.MEM0_API_KEY || '',
-  apiKey: getAIKeyForModule('agents'),
-  config: {
-    compatibility: 'strict',
-  }
-});
-
-// Mem0 configuration constants for impact assessment
-const MEM0_CONFIG = {
-  user_id: 'impact-assessment-agent', // Specific user ID for impact agent
-  org_id: process.env.MEM0_ORG_ID || '',
-  project_id: process.env.MEM0_PROJECT_ID || '',
-  app_id: 'prism-impact-agent',
-  agent_id: 'supply-chain-impact-agent',
-  run_id: `impact-run-${Date.now()}` // Generate a unique run ID
-};
 
 // Enhanced Impact Assessment Schema with Standardized Response Formats
 const ImpactMetricsSchema = z.object({
@@ -121,11 +101,11 @@ class ProductionImpactAssessmentAgent {
   public async getCachedImpactAssessment(simulationId: string): Promise<any | null> {
     try {
       const cacheKey = `impact_assessment_v2:${simulationId}`
-      const cached = await redis.get(cacheKey)
+      const cached = await getRedisClient().get(cacheKey)
       
       if (cached) {
         console.log(`📋 Retrieved cached impact assessment for simulation ${simulationId}`)
-        try { await redis.setex(`${cacheKey}:hit`, 300, new Date().toISOString()) } catch {}
+        try { await getRedisClient().setex(`${cacheKey}:hit`, 300, new Date().toISOString()) } catch {}
         return cached
       }
       
@@ -140,9 +120,9 @@ class ProductionImpactAssessmentAgent {
     try {
       const cacheKey = `impact_assessment_v2:${simulationId}`
       const ttl = 7200
-      await redis.setex(cacheKey, ttl, JSON.stringify(assessment))
+      await getRedisClient().setex(cacheKey, ttl, JSON.stringify(assessment))
       try {
-        await redis.setex(`${cacheKey}:meta`, ttl, JSON.stringify({
+        await getRedisClient().setex(`${cacheKey}:meta`, ttl, JSON.stringify({
           cachedAt: new Date().toISOString(),
           simulationId,
           version: 'v2.0',
@@ -281,28 +261,28 @@ class ProductionImpactAssessmentAgent {
 SUPPLY CHAIN IMPACT ASSESSMENT ANALYSIS:
 
 Simulation Details:
-- Scenario: ${impactData.scenarioName} (${impactData.scenarioType})
+- Scenario: ${supplyChainData.simulation.name} (${supplyChainData.simulation.scenario_type})
 - Supply Chain: ${supplyChainData.supplyChain?.name || 'Unknown'}
 - Organization: ${supplyChainData.supplyChain?.organisation || 'Unknown'}
 - Analysis Date: ${new Date().toISOString()}
 
 IMPACT METRICS:
-- Total Cost Impact: ${impactData.metrics.totalCostImpact}
-- Average Delay: ${impactData.metrics.averageDelay}
-- Inventory Reduction: ${impactData.metrics.inventoryReduction}
-- Recovery Time: ${impactData.metrics.recoveryTime}
-- Affected Nodes: ${impactData.metrics.affectedNodes}
-- Network Resilience Score: ${impactData.metrics.networkResilience || 'N/A'}/100
-- Cascading Probability: ${Math.round((impactData.metrics.cascadingProbability || 0) * 100)}%
+- Total Cost Impact: ${impactData.financialImpact?.totalCostImpact || 'Unknown'}
+- Average Delay: ${impactData.operationalImpact?.averageDelay || 'Unknown'}
+- Inventory Reduction: ${impactData.operationalImpact?.inventoryReduction || 'Unknown'}
+- Recovery Time: ${impactData.operationalImpact?.recoveryTime || 'Unknown'}
+- Affected Nodes: ${impactData.operationalImpact?.affectedNodes || 'Unknown'}
+- Network Resilience Score: ${impactData.networkResilience || 'N/A'}/100
+- Cascading Probability: ${Math.round((impactData.cascadingProbability || 0) * 100)}%
 
 KEY FINDINGS:
-${impactData.keyFindings.map((finding: string) => `- ${finding}`).join('\n')}
+${(impactData.keyFindings || (impactData.executiveSummary ? [impactData.executiveSummary] : [])).map((finding: string) => `- ${finding}`).join('\n')}
 
 FINANCIAL IMPACT BREAKDOWN:
-${impactData.impactBreakdown.map((impact: string) => `- ${impact}`).join('\n')}
+${(impactData.financialImpact?.costBreakdown || []).map((c: any) => `- ${c.category}: ${c.amount} (${c.percentage}%)`).join('\n')}
 
 RISK FACTORS IDENTIFIED:
-${impactData.riskFactors.map((risk: string) => `- ${risk}`).join('\n')}
+${(impactData.riskFactors || []).map((risk: string) => `- ${risk}`).join('\n')}
 
 ${impactData.cascadingEffects && impactData.cascadingEffects.length > 0 ? 
 `CASCADING EFFECTS:
@@ -313,7 +293,7 @@ ${impactData.cascadingEffects.slice(0, 5).map((effect: any) =>
 ${impactData.mitigationStrategies && impactData.mitigationStrategies.length > 0 ? 
 `TOP MITIGATION STRATEGIES:
 ${impactData.mitigationStrategies.slice(0, 3).map((strategy: any) => 
-  `- ${strategy.strategy} (Cost: ${strategy.estimatedCost}, Timeline: ${strategy.timeToImplement})`
+  `- ${strategy.title || strategy.strategy} (Cost: ${strategy.estimatedCost}, Timeline: ${strategy.timeToImplement})`
 ).join('\n')}` : ''}
 
 ANALYSIS METADATA:
@@ -406,7 +386,7 @@ ANALYSIS METADATA:
     
     // Create a consistent hash from scenario parameters
     const hashString = JSON.stringify(hashInput, Object.keys(hashInput).sort())
-    return require('crypto').createHash('sha256').update(hashString).digest('hex').substring(0, 16)
+    return createHash('sha256').update(hashString).digest('hex').substring(0, 16)
   }
 
   // Check for similar scenario results that can be reused
@@ -424,7 +404,7 @@ ANALYSIS METADATA:
       const scenarioCacheKey = `scenario_cache_v2:${scenarioHash}`
       
       try {
-        const similarResults = await redis.get(scenarioCacheKey)
+        const similarResults = await getRedisClient().get(scenarioCacheKey)
         if (similarResults) {
           console.log(`🔍 Found similar scenario results for hash: ${scenarioHash}`)
           return JSON.parse(similarResults as string)
@@ -453,7 +433,7 @@ ANALYSIS METADATA:
         const scenarioHash = this.generateScenarioHash(simulation)
         const scenarioCacheKey = `scenario_cache_v2:${scenarioHash}`
         try {
-          await redis.setex(scenarioCacheKey, 14400, JSON.stringify({
+          await getRedisClient().setex(scenarioCacheKey, 14400, JSON.stringify({
             ...assessment,
             originalSimulationId: simulationId,
             scenarioHash,
@@ -470,7 +450,9 @@ ANALYSIS METADATA:
   }
 
   // Comprehensive data gathering for impact analysis
-  private async gatherSupplyChainData(simulationId: string): Promise<{
+  private async gatherSupplyChainData(
+    simulationId: string
+  ): Promise<{
     simulation: Simulation,
     supplyChain: SupplyChain,
     nodes: Node[],
@@ -498,7 +480,7 @@ ANALYSIS METADATA:
 
       if (scError) throw scError
 
-      // Fetch nodes
+      // Always fetch nodes from Supabase (source of truth)
       const { data: nodes, error: nodesError } = await supabaseServer
         .from('nodes')
         .select('*')
@@ -506,7 +488,7 @@ ANALYSIS METADATA:
 
       if (nodesError) throw nodesError
 
-      // Fetch edges
+      // Always fetch edges from Supabase (source of truth)
       const { data: edges, error: edgesError } = await supabaseServer
         .from('edges')
         .select('*')
@@ -855,9 +837,11 @@ ANALYSIS METADATA:
   }
 
   // Main method for comprehensive impact assessment
-  public async conductComprehensiveImpactAssessment(simulationId: string): Promise<any> {
+  public async conductComprehensiveImpactAssessment(
+    simulationId: string
+  ): Promise<any> {
     const startTime = Date.now()
-    console.log(`� Starting comprehensive impact assessment for simulation ${simulationId}`)
+    console.log(`🚀 Starting comprehensive impact assessment for simulation ${simulationId}`)
 
     try {
       // Check cache first
@@ -879,7 +863,7 @@ ANALYSIS METADATA:
         }
       }
 
-      // Gather comprehensive data
+      // Gather comprehensive data — always from Supabase
       const supplyChainData = await this.gatherSupplyChainData(simulationId)
       
       // Build memory context from previous assessments
@@ -938,13 +922,13 @@ ANALYSIS METADATA:
     
     try {
       const analysisPrompt = `
-As an expert supply chain impact assessment AI, analyze this supply chain disruption scenario and provide comprehensive impact analysis.
-
-SUPPLY CHAIN CONTEXT:
-${JSON.stringify(supplyChainData.supplyChain, null, 2)}
+You are a supply chain financial impact analyst.
 
 DISRUPTION SCENARIO:
 ${JSON.stringify(supplyChainData.simulation, null, 2)}
+
+SUPPLY CHAIN CONTEXT:
+${JSON.stringify(supplyChainData.supplyChain, null, 2)}
 
 NETWORK TOPOLOGY:
 - Total Nodes: ${supplyChainData.nodes.length}
@@ -957,9 +941,16 @@ ${memoryContext}
 IMPACT PROPAGATION DATA:
 ${JSON.stringify(impactPropagation, null, 2)}
 
+ANALYST INSTRUCTIONS:
+Step 1 — Graph traversal: starting from the disrupted node, follow edges in their directed downstream flow. Collect every node reachable from the disrupted node, directly or transitively.
+Step 2 — Per-node assessment: for each downstream node found, assign an impactType (e.g., delay, capacityLoss, shutdown, costIncrease) and calculate estimated financial loss scaled by node type, hop distance, and severity.
+Step 3 — Totals: Calculate total cascading cost impact and operational days lost based on the downstream propagation.
+
+Do not include the disrupted node itself in downstream impacts.
+Do not include nodes unreachable from the disrupted node.
+
 CRITICAL FORMATTING REQUIREMENTS:
 You MUST format ALL key metrics in the following standardized, human-friendly format:
-
 - totalCostImpact: Use format "$XXXk - $XXXk" (e.g., "$500K - $750K", "$1.2M - $1.8M")
 - averageDelay: Use format "XX-XX days" (e.g., "30-45 days", "60-90 days")
 - inventoryReduction: Use format "XX-XX%" (e.g., "20-30%", "15-25%")
@@ -968,9 +959,8 @@ You MUST format ALL key metrics in the following standardized, human-friendly fo
 - timeToImplement (in mitigation strategies): Use format "XX-XX days" or "XX-XX weeks"
 - riskReduction (in mitigation strategies): Use format "XX-XX%" showing effectiveness range
 
-NEVER use raw numbers or single values. Always provide ranges that reflect confidence intervals and realistic variance.
-
-Please provide a comprehensive impact assessment following the structured format required.
+NEVER use raw numbers or single values for these fields. Always provide ranges that reflect confidence intervals and realistic variance.
+Please provide a comprehensive impact assessment matching the strict JSON schema required.
       `
 
       // Configure Google provider with dedicated key if available
@@ -981,78 +971,322 @@ Please provide a comprehensive impact assessment following the structured format
       let retries = 2; // max 2 retries (3 total attempts)
       while (retries >= 0) {
         try {
-          const result = await generateObject({
-            model: google(AI_MODELS.agents),
-            schema: SimulationResultsSchema,
-            prompt: analysisPrompt + "\n\nCRITICAL: You must return a COMPLETE JSON object. Do not truncate your response. Be concise if necessary to ensure completeness.",
-            maxTokens: 6000,
-            temperature: 0.2
+          const traceId = `impact-llm-${Date.now()}`;
+          const traceResult = await withTrace(traceId, 'ImpactAgent', async () => {
+            const agent = new LlmAgent({
+              name: "impact_agent",
+              description: "Expert supply chain impact assessment AI",
+              instruction: "You are an expert supply chain impact assessment AI. Follow the schema exactly.",
+              model: new Gemini({ 
+                model: AI_MODELS.agents, 
+                apiKey: getAIKeyForModule("agents")
+              }),
+              outputSchema: SimulationResultsSchema
+            });
+
+            const runner = new InMemoryRunner({ appName: 'impact', agent });
+            let finalContent = "";
+            for await (const event of runner.runEphemeral({
+              userId: 'system',
+              newMessage: { role: 'user', parts: [{ text: analysisPrompt + "\n\nCRITICAL: You must return a COMPLETE JSON object. Do not truncate your response. Be concise if necessary to ensure completeness." }] }
+            })) {
+              const text = stringifyContent(event);
+              if (text) finalContent += text;
+            }
+
+            // Clean markdown JSON wrapper if present
+            let cleanContent = finalContent.replace(/^```json\n/, '').replace(/\n```$/, '').trim();
+
+            // Try to extract a valid JSON object even from truncated output
+            let parsed: any = null;
+            try {
+              parsed = JSON.parse(cleanContent);
+            } catch {
+              // Attempt 1: extract outermost { ... } via regex
+              const jsonMatch = cleanContent.match(/\{[\s\S]*\}/);
+              if (jsonMatch) {
+                try { parsed = JSON.parse(jsonMatch[0]); } catch { /* still broken */ }
+              }
+              // Attempt 2: try closing unclosed brackets (truncated stream)
+              if (!parsed) {
+                let repaired = cleanContent;
+                const opens = (repaired.match(/\{/g) || []).length;
+                const closes = (repaired.match(/\}/g) || []).length;
+                for (let i = 0; i < opens - closes; i++) repaired += '}';
+                try { parsed = JSON.parse(repaired); } catch { /* give up */ }
+              }
+            }
+
+            if (!parsed) {
+              console.warn('⚠️ ADK returned un-parseable JSON — falling back to BFS immediately.');
+              return { success: false, error: 'Truncated or invalid JSON from AI' };
+            }
+
+            return { success: true, data: parsed };
           });
-          return result.object;
+
+          if (!traceResult.success) throw new Error(traceResult.error);
+          return traceResult.data;
         } catch (error: any) {
           const errMsg: string = error?.message || '';
-          // Quota/rate-limit errors — no point retrying immediately
+          // Quota/rate-limit errors or truncated JSON — no point retrying
           const isRateLimit = errMsg.includes('quota') || errMsg.includes('rate') || errMsg.includes('429') || errMsg.includes('RESOURCE_EXHAUSTED') || errMsg.toLowerCase().includes('overloaded') || errMsg.toLowerCase().includes('temporary');
-          if (isRateLimit) {
-            console.error('❌ AI quota/overload exceeded — using fallback data:', errMsg);
-            // Return fallback instead of throwing error when Google AI is overloaded
-            return this.generateFallbackImpactData(impactPropagation);
+          const isTruncated = errMsg.includes('Unexpected end of JSON') || errMsg.includes('Truncated or invalid JSON');
+          if (isRateLimit || isTruncated) {
+            console.error(`❌ ${isTruncated ? 'Truncated AI response' : 'AI quota/overload exceeded'} — using BFS baseline algorithm:`, errMsg);
+            return this.generateFallbackImpactData(impactPropagation, supplyChainData.nodes, supplyChainData.edges, supplyChainData.simulation);
           }
           retries--;
           console.warn(`⚠️ AI generation failed. Retries left: ${retries}. Error:`, errMsg);
           if (retries < 0) {
-            console.warn('❌ AI generation retries exhausted — using fallback data.');
-            return this.generateFallbackImpactData(impactPropagation);
+            console.warn('❌ AI generation retries exhausted — using BFS baseline algorithm.');
+            return this.generateFallbackImpactData(impactPropagation, supplyChainData.nodes, supplyChainData.edges, supplyChainData.simulation);
           }
           await new Promise(resolve => setTimeout(resolve, 2000));
         }
       }
-      return this.generateFallbackImpactData(impactPropagation);
+      return this.generateFallbackImpactData(impactPropagation, supplyChainData.nodes, supplyChainData.edges, supplyChainData.simulation);
     } catch (error) {
-      console.error('❌ Error in AI analysis generation, using fallback:', error)
-      return this.generateFallbackImpactData(impactPropagation);
+      console.error('❌ Error in AI analysis generation, using BFS baseline algorithm:', error)
+      return this.generateFallbackImpactData(impactPropagation, supplyChainData.nodes, supplyChainData.edges, supplyChainData.simulation);
     }
   }
 
-  // Fallback data generator when AI is overloaded/rate-limited
-  private generateFallbackImpactData(impactPropagation: any): any {
+  // ─── BFS Baseline Impact Algorithm ───────────────────────────────────────────
+  // Deterministic expert-system fallback that runs when the LLM is unavailable.
+  // Uses graph traversal + rule-based cost tables to produce defensible numbers.
+  // ─────────────────────────────────────────────────────────────────────────────
+  private generateFallbackImpactData(impactPropagation: any, nodes: Node[] = [], edges: Edge[] = [], simulation?: any): any {
+    console.log(`🔢 [BFS-BASELINE] Running deterministic impact assessment on ${nodes.length} nodes, ${edges.length} edges`);
+
+    // ── Cost lookup table by node type (USD base cost) ──
+    const BASE_COSTS: Record<string, number> = {
+      port:         500000,
+      factory:      300000,
+      manufacturer: 300000,
+      supplier:     200000,
+      warehouse:     80000,
+      distributor:   60000,
+      retailer:      40000,
+      other:         30000,
+    };
+
+    // ── Hop decay (impact weakens with graph distance) ──
+    const getHopDecay = (hop: number): number => {
+      if (hop === 1) return 1.0;
+      if (hop === 2) return 0.5;
+      if (hop === 3) return 0.2;
+      return 0.05;
+    };
+
+    // ── Impact type multiplier ──
+    const IMPACT_MULTIPLIER: Record<string, number> = {
+      shutdown:      1.5,
+      capacityLoss:  1.0,
+      delay:         0.6,
+      costIncrease:  0.3,
+    };
+
+    // ── Assign impact type by hop distance and node type ──
+    const getImpactType = (nodeType: string, hop: number): string => {
+      const t = nodeType.toLowerCase();
+      if (hop === 1) {
+        if (t === 'factory' || t === 'manufacturer' || t === 'port') return 'shutdown';
+        return 'capacityLoss';
+      }
+      if (hop === 2) return 'delay';
+      return 'costIncrease';
+    };
+
+    // ── Step 1: Build downstream adjacency map ──
+    const downstream = new Map<string, string[]>();
+    const nodeById = new Map<string, any>();
+    nodes.forEach(n => {
+      nodeById.set(n.node_id, n);
+      downstream.set(n.node_id, []);
+    });
+    edges.forEach(e => {
+      const list = downstream.get(e.from_node_id) || [];
+      list.push(e.to_node_id);
+      downstream.set(e.from_node_id, list);
+    });
+
+    // ── Step 2: Determine seed (disrupted) nodes ──
+    const directlyAffected: string[] = impactPropagation?.directlyAffected || [];
+    const seedNodes = directlyAffected.length > 0
+      ? directlyAffected
+      : (nodes.length > 0 ? [nodes[0].node_id] : []);
+
+    // ── Step 3: BFS from disrupted nodes ──
+    const visited = new Set<string>(seedNodes);
+    const queue: Array<{ nodeId: string; hop: number; path: string[] }> =
+      seedNodes.map(id => ({ nodeId: id, hop: 1, path: [id] }));
+
+    interface ImpactRecord {
+      nodeId: string; nodeName: string; nodeType: string;
+      impactType: string; estimatedLoss: number; hop: number; path: string[];
+    }
+    const downstreamImpacts: ImpactRecord[] = [];
+    let head = 0;
+    while (head < queue.length) {
+      const { nodeId, hop, path } = queue[head++];
+      const node = nodeById.get(nodeId);
+      if (!node) continue;
+
+      const nodeType = ((node.type || node.node_type || 'other') as string).toLowerCase();
+      const impactType = getImpactType(nodeType, hop);
+      const baseCost = BASE_COSTS[nodeType] ?? BASE_COSTS['other'];
+      const estimatedLoss = Math.round(baseCost * getHopDecay(hop) * IMPACT_MULTIPLIER[impactType]);
+
+      downstreamImpacts.push({
+        nodeId,
+        nodeName: node.name || node.label || nodeId,
+        nodeType,
+        impactType,
+        estimatedLoss,
+        hop,
+        path,
+      });
+
+      for (const neighborId of (downstream.get(nodeId) || [])) {
+        if (!visited.has(neighborId)) {
+          visited.add(neighborId);
+          queue.push({ nodeId: neighborId, hop: hop + 1, path: [...path, neighborId] });
+        }
+      }
+    }
+
+    // ── Step 4: Compute totals ──
+    const totalCostImpact = downstreamImpacts.reduce((s, n) => s + n.estimatedLoss, 0);
+    const shutdownCount    = downstreamImpacts.filter(n => n.impactType === 'shutdown').length;
+    const capacityLossCount = downstreamImpacts.filter(n => n.impactType === 'capacityLoss').length;
+    const delayCount       = downstreamImpacts.filter(n => n.impactType === 'delay').length;
+    const costIncreaseCount = downstreamImpacts.filter(n => n.impactType === 'costIncrease').length;
+    const operationalDaysLost = Math.min(30, shutdownCount * 7 + capacityLossCount * 3 + delayCount * 1);
+
+    const formatCost = (n: number): string => {
+      if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M - $${(n * 1.4 / 1_000_000).toFixed(1)}M`;
+      return `$${Math.round(n / 1000)}K - $${Math.round(n * 1.4 / 1000)}K`;
+    };
+
+    const totalNodes = nodes.length;
+    const totalEdges = edges.length;
+    const networkDensity = totalNodes > 1
+      ? parseFloat((totalEdges / (totalNodes * (totalNodes - 1))).toFixed(3))
+      : 0;
+    const maxHop = downstreamImpacts.length > 0 ? Math.max(...downstreamImpacts.map(n => n.hop)) : 0;
+    const avgHop = downstreamImpacts.length > 0
+      ? parseFloat((downstreamImpacts.reduce((s, n) => s + n.hop, 0) / downstreamImpacts.length).toFixed(1))
+      : 1;
+
+    // ── Step 5: Build schema-conforming cascading effects ──
+    const cascadingEffects = downstreamImpacts.map(impact => ({
+      affectedNode: impact.nodeName,
+      impactType: impact.impactType === 'shutdown' || impact.impactType === 'capacityLoss' ? 'operational' : impact.impactType === 'delay' ? 'supply' : 'financial',
+      severity: impact.impactType === 'shutdown' ? 'CRITICAL' : impact.impactType === 'capacityLoss' ? 'HIGH' : impact.impactType === 'delay' ? 'MEDIUM' : 'LOW',
+      timeline: impact.hop === 1 ? 'Immediate (Day 1–3)' : impact.hop === 2 ? 'Short-term (Day 4–10)' : 'Medium-term (Day 11–30)',
+      propagationPath: impact.path.map(id => nodeById.get(id)?.name || nodeById.get(id)?.label || id),
+      probability: impact.impactType === 'shutdown' ? 0.95 : impact.impactType === 'capacityLoss' ? 0.80 : impact.impactType === 'delay' ? 0.65 : 0.40,
+      financialImpact: formatCost(impact.estimatedLoss),
+      mitigationComplexity: impact.impactType === 'shutdown' ? 'HIGH' : impact.impactType === 'capacityLoss' ? 'MEDIUM' : 'LOW',
+    }));
+
+    console.log(`✅ [BFS-BASELINE] Identified ${downstreamImpacts.length} affected nodes across ${maxHop} hops. Total exposure: ${formatCost(totalCostImpact)}`);
+
     return {
-      executiveSummary: "Due to current AI provider service limitations (model overloaded), this impact analysis was generated using algorithmic baseline calculations. A mid-to-high level disruption is anticipated across the directly affected nodes with moderate cascading effects to downstream facilities.",
-      financialImpact: {
-        totalCostImpact: "$250K - $850K",
-        revenueAtRisk: "$1.5M - $3.2M",
-        costBreakdown: [
-          { category: "Logistics", amount: "$150K", percentage: 40 },
-          { category: "Inventory", amount: "$80K", percentage: 25 },
-          { category: "Operational", amount: "$20K", percentage: 35 }
-        ]
+      scenarioName: simulation?.name || 'Disruption Analysis',
+      scenarioType: simulation?.scenario_type || 'Infrastructure',
+      status: 'completed',
+      completedAt: new Date().toISOString(),
+      metrics: {
+        totalCostImpact: formatCost(totalCostImpact),
+        averageDelay: `${operationalDaysLost}-${Math.min(30, operationalDaysLost + 10)} days`,
+        inventoryReduction: shutdownCount > 0 ? '20-35%' : capacityLossCount > 0 ? '10-20%' : '5-10%',
+        recoveryTime: `${operationalDaysLost * 2}-${operationalDaysLost * 3 || 7} days`,
+        affectedNodes: downstreamImpacts.length,
+        criticalPath: downstreamImpacts
+          .filter(n => n.impactType === 'shutdown')
+          .map(n => n.nodeName)
+          .join(' → ') || (downstreamImpacts[0]?.nodeName ?? 'No critical path identified'),
+        networkResilience: Math.max(0, Math.round(100 - (downstreamImpacts.length / Math.max(1, totalNodes)) * 100)),
+        cascadingProbability: Math.min(0.95, 0.3 + downstreamImpacts.length * 0.05),
       },
-      operationalImpact: {
-        averageDelay: "15-30 days",
-        inventoryReduction: "15-20%",
-        capacityUtilization: 65,
-        criticalShortages: ["Raw Materials", "Logistics Capacity"]
-      },
+      keyFindings: [
+        `BFS traversal from ${seedNodes.length} disrupted node(s) reached ${downstreamImpacts.length} downstream node(s) across ${maxHop} hop(s).`,
+        `${shutdownCount} node(s) face complete operational shutdown — highest priority recovery targets.`,
+        `${capacityLossCount} node(s) operating at reduced capacity; ${delayCount} node(s) experiencing throughput delays.`,
+        `Estimated total financial exposure: ${formatCost(totalCostImpact)} (conservative to upper-bound range).`,
+        `Operational recovery baseline: ${operationalDaysLost} days under current network topology.`,
+        'Analysis generated by deterministic BFS expert system (baseline mode — AI provider unavailable).',
+      ],
+      impactBreakdown: [
+        `Hop 1 — Direct shutdowns: ${shutdownCount} node(s), exposure ${formatCost(downstreamImpacts.filter(n => n.impactType === 'shutdown').reduce((s, n) => s + n.estimatedLoss, 0))}.`,
+        `Hop 1 — Capacity reductions: ${capacityLossCount} node(s), throughput reduced 40–60%.`,
+        `Hop 2 — Downstream delays: ${delayCount} node(s), deferring throughput by up to ${operationalDaysLost} days.`,
+        `Hop 3+ — Cost pressures: ${costIncreaseCount} node(s), elevated operational costs without shutdown.`,
+        `Network density ${networkDensity} — ${networkDensity < 0.3 ? 'sparse topology increases single-point-of-failure risk' : 'moderate redundancy provides some buffering'}.`,
+      ],
+      riskFactors: [
+        'Deterministic BFS identifies structural blast radius but does not capture stochastic demand variability.',
+        `${shutdownCount} critical node(s) with no bypass in current graph topology.`,
+        'Cost estimates use industry-average base costs per node type; actual exposure may vary by 40%.',
+      ],
       mitigationStrategies: [
         {
-          id: "mitigation-1",
-          title: "Expedite Alternative Transportation",
-          description: "Immediately activate secondary freight and air transport allocations where feasible.",
-          estimatedCost: "$100K - $150K",
-          timeToImplement: "3-5 days",
-          riskReduction: "40-60%",
-          difficulty: "Medium"
+          strategy: 'Activate emergency rerouting through secondary nodes to bypass shutdown facilities.',
+          estimatedCost: formatCost(Math.round(totalCostImpact * 0.15)),
+          timeToImplement: '2-5 days',
+          riskReduction: '40-55%',
+          feasibility: 'HIGH',
+          priority: 'IMMEDIATE',
+          dependencies: ['Secondary node availability', 'Logistics coordination'],
+          successProbability: 0.80,
+          roi: 3.2,
         },
         {
-          id: "mitigation-2",
-          title: "Reallocate Strategic Inventory",
-          description: "Redistribute existing inventory from unaffected regional warehouses to balance fulfillment.",
-          estimatedCost: "$50K - $75K",
-          timeToImplement: "1-3 days",
-          riskReduction: "25-35%",
-          difficulty: "Low"
-        }
-      ]
+          strategy: 'Deploy safety stock from unaffected warehouses to buffer downstream shortfalls.',
+          estimatedCost: formatCost(Math.round(totalCostImpact * 0.08)),
+          timeToImplement: '1-3 days',
+          riskReduction: '20-30%',
+          feasibility: 'HIGH',
+          priority: 'IMMEDIATE',
+          dependencies: ['Inventory visibility', 'Transport capacity'],
+          successProbability: 0.85,
+          roi: 4.1,
+        },
+        {
+          strategy: 'Negotiate expedited contracts with alternate suppliers or 3PL providers for affected routes.',
+          estimatedCost: formatCost(Math.round(totalCostImpact * 0.25)),
+          timeToImplement: '7-14 days',
+          riskReduction: '55-70%',
+          feasibility: 'MEDIUM',
+          priority: 'SHORT_TERM',
+          dependencies: ['Vendor qualification', 'Contract approval'],
+          successProbability: 0.70,
+          roi: 2.5,
+        },
+      ],
+      cascadingEffects,
+      networkAnalysis: {
+        totalNodes,
+        totalEdges,
+        networkDensity,
+        criticalNodes: downstreamImpacts.filter(n => n.impactType === 'shutdown').map(n => n.nodeName),
+        singlePointsOfFailure: downstreamImpacts.filter(n => n.impactType === 'shutdown' && n.hop === 1).map(n => n.nodeName),
+        alternativeRoutes: Math.max(0, totalEdges - downstreamImpacts.length),
+        averageShortestPath: avgHop,
+        clusteringCoefficient: parseFloat(Math.min(0.8, networkDensity * 2).toFixed(2)),
+      },
+      confidenceScore: nodes.length > 0 ? 0.72 : 0.40,
+      monteCarloRuns: 0,
+      analysisDepth: nodes.length > 0 ? 'INTERMEDIATE' : 'BASIC',
+      processingTime: 0,
+      dataQuality: {
+        completeness: nodes.length > 0 ? 0.85 : 0.40,
+        consistency: 0.90,
+        recency: 0.75,
+      },
+      isBaselineFallback: true,
     };
   }
 }
@@ -1107,12 +1341,15 @@ export async function POST(request: NextRequest) {
 
     console.log(`🎯 POST Impact assessment for simulation: ${simulationId} (force: ${forceRefresh})`)
     
+    const audit = agentAudit('ImpactAgent', 'system');
+    audit.start(`Impact assessment for simulation ${simulationId}`);
+
     const agent = new ProductionImpactAssessmentAgent()
     
     // Clear cache if force refresh is requested
     if (forceRefresh) {
       try {
-        await redis.del(`impact_assessment_v2:${simulationId}`)
+        await getRedisClient().del(`impact_assessment_v2:${simulationId}`)
         console.log('🗑️ Cache cleared for force refresh')
       } catch (redisErr) {
         console.warn('⚠️ Redis cache clear skipped (Redis unavailable):', (redisErr as any)?.message)
@@ -1121,6 +1358,8 @@ export async function POST(request: NextRequest) {
     
     const result = await agent.conductComprehensiveImpactAssessment(simulationId)
     
+    audit.success(`Impact assessment completed for simulation ${simulationId}`);
+
     return NextResponse.json({
       success: true,
       data: result,

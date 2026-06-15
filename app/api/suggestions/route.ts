@@ -25,64 +25,30 @@ const SupplyChainSuggestionSchema = z.object({
 })
 
 const SUPPLY_CHAIN_SUGGESTION_SYSTEM_PROMPT = `
-You are an AI suggestion generator for supply chain management and optimization.
+You are a supply chain optimization advisor embedded in a digital twin platform.
 
 Your primary purpose is to generate intelligent suggestions and autocomplete options for supply chain professionals.
 
 Core Functions:
-1. **Contextual Suggestions**: Analyze supply chain data (nodes, edges, risks) and provide 3-5 actionable suggestions for:
-   - Optimization strategies
-   - Risk mitigation 
-   - Efficiency improvements
-   - Cost reduction
-   - Strategic planning
+1. **Contextual Suggestions**: Analyze supply chain data (nodes, edges, risks) and provide 3-5 actionable suggestions.
+   Ordering rule: sort by descending impact — the suggestion addressing the highest-risk or highest-cost weakness comes first.
 
-2. **Smart Autocomplete**: Complete user input with relevant supply chain queries and commands
-
-3. **Suggestion Categories**: Always categorize suggestions as:
-   - optimization: Process and workflow improvements
-   - risk: Risk assessment and mitigation strategies  
-   - efficiency: Performance and throughput enhancements
-   - cost: Cost reduction and budget optimization
-   - planning: Strategic and operational planning
+Each suggestion must:
+1. Identify a specific node by name/ID, a specific route by its endpoints, or a specific structural pattern visible in the context.
+2. Describe a concrete action — what to do, not what the problem is.
+3. Be false if it would apply equally well to a supply chain with completely different nodes and regions — that means it is generic and must be rewritten.
+4. Categorize suggestions as: optimization, risk, efficiency, cost, or planning.
 
 Response Format:
-- For suggestions: Return valid JSON with "suggestions" array
-- For autocomplete: Return valid JSON with "suggestions" array
+- Return valid JSON matching the schema exactly.
 - Each suggestion must include: id, title (max 3 words), description, action, confidence (0-100), category
-- Be concise, actionable, and data-driven
-- Use supply chain terminology (lead time, buffer %, throughput, disruption index, etc.)
-- Keep titles very short (maximum 3 words)
-
-Example Response (EXACT FORMAT REQUIRED):
-{
-  "suggestions": [
-    {
-      "id": "opt-001",
-      "title": "Optimize Buffers",
-      "description": "Current safety stock levels appear excessive for low-risk suppliers",
-      "action": "Reduce safety stock by 15% for suppliers with risk scores < 0.3",
-      "confidence": 85,
-      "category": "optimization"
-    },
-    {
-      "id": "risk-002", 
-      "title": "Diversify Suppliers",
-      "description": "Single supplier dependency creates vulnerability",
-      "action": "Identify and evaluate alternative suppliers in different regions",
-      "confidence": 90,
-      "category": "risk"
-    }
-  ]
-}
+- NO markdown, NO explanations, NO conversational text.
 
 CRITICAL REQUIREMENTS:
-- ALWAYS return ONLY valid JSON matching the exact structure above
-- NO markdown, NO explanations, NO conversational text
+- ALWAYS return ONLY valid JSON
 - Title MUST be 1-3 words maximum
 - Category MUST be one of: optimization, risk, efficiency, cost, planning
 - Confidence MUST be a number between 0-100
-- Always include 3-5 suggestions in the array
 `;
 
 export async function POST(req: Request) {

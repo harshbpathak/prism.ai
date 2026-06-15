@@ -224,7 +224,7 @@ export const tavilyTools = (
       }),
       execute: async ({ urls }) => {
         try {
-          const response = await client.extract(urls)
+          const response = await client.extract(urls, {})
           return {
             results: response.results.map((result) => ({
               url: result.url,

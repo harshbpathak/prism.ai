@@ -79,60 +79,52 @@ export const useCopilotActions = (props: UseCopilotActionsProps) => {
   useAdvancedRiskActions(actionContext);
   useVisualPerformanceActions(actionContext);
 
-  // Enhanced nodes data with validation context
+  // Enhanced nodes data with validation context — only populated fields sent
   const nodesData = {
-    nodes: nodes.map(node => ({
-      id: node.id,
-      type: node.type,
-      label: node.data?.label || 'Untitled',
-      position: node.position,
-      data: {
-        // Core properties
+    nodes: nodes.map(node => {
+      // Collect all possible data fields
+      const rawData: Record<string, any> = {
         description: node.data?.description,
         country: node.data?.country || node.data?.location?.country,
         address: node.data?.address,
         type: node.data?.type,
-        
-        // Common properties
         capacity: node.data?.capacity,
         leadTime: node.data?.leadTime,
         riskScore: node.data?.riskScore,
-        
-        // Supplier-specific
         supplierTier: node.data?.supplierTier,
         supplyCapacity: node.data?.supplyCapacity,
         materialType: node.data?.materialType,
         reliabilityPct: node.data?.reliabilityPct,
-        
-        // Factory-specific
         productionCapacity: node.data?.productionCapacity,
         cycleTime: node.data?.cycleTime,
         utilizationPct: node.data?.utilizationPct,
         yieldRate: node.data?.yieldRate,
-        
-        // Warehouse-specific
         storageCapacity: node.data?.storageCapacity,
         temperatureControl: node.data?.temperatureControl,
         storageCostPerUnit: node.data?.storageCostPerUnit,
         handlingCostPerUnit: node.data?.handlingCostPerUnit,
-        
-        // Distribution-specific
         fleetSize: node.data?.fleetSize,
         deliveryRangeKm: node.data?.deliveryRangeKm,
         serviceLevelPct: node.data?.serviceLevelPct,
-        
-        // Retailer-specific
         demandRate: node.data?.demandRate,
         shelfSpaceCap: node.data?.shelfSpaceCap,
         reorderPoint: node.data?.reorderPoint,
-        
-        // External dependencies
         dependsOnExternalCompany: node.data?.dependsOnExternalCompany,
         externalCompanyName: node.data?.externalCompanyName,
         externalCompanyCountry: node.data?.externalCompanyCountry,
         externalCompanyDescription: node.data?.externalCompanyDescription
-      }
-    })),
+      };
+      // Strip out undefined/null values to save tokens
+      const data = Object.fromEntries(
+        Object.entries(rawData).filter(([_, v]) => v !== undefined && v !== null)
+      );
+      return {
+        id: node.id,
+        type: node.type,
+        label: node.data?.label || 'Untitled',
+        data
+      };
+    }),
     totalNodes: nodes.length,
     nodeTypes: [...new Set(nodes.map(n => n.data?.type))],
     hasConnections: edges.length > 0,
@@ -143,8 +135,6 @@ export const useCopilotActions = (props: UseCopilotActionsProps) => {
       criticalIssues: validationIssues.filter(issue => issue.severity === 'error').slice(0, 5)
     }
   };
-  
-  // console.log("🔍 CopilotReadable - Enhanced Nodes Data:", nodesData);
   
   useCopilotReadable({
     description: "Current supply chain canvas nodes with their comprehensive configurations and validation status",
@@ -182,24 +172,7 @@ export const useCopilotActions = (props: UseCopilotActionsProps) => {
     value: edgesData
   });
 
-  // Enhanced supply chain analysis
-  const supplyChainAnalysis = {
-    structure: {
-      nodeCount: nodes.length,
-      connectionCount: edges.length,
-      nodeTypes: [...new Set(nodes.map(n => n.type))],
-      countries: [...new Set(nodes.map(n => n.data?.country || n.data?.location?.country).filter(Boolean))],
-      avgRiskScore: nodes.length > 0 ? 
-        nodes.reduce((sum: number, n: Node) => sum + (n.data?.riskScore || 0), 0) / nodes.length : 0
-    },
-    validation: validationSummary,
-    recommendations: [] // Recommendations are now handled by validation actions
-  };
-  
-  useCopilotReadable({
-    description: "Comprehensive supply chain analysis including structure, validation, and recommendations",
-    value: supplyChainAnalysis
-  });
+  // Removed redundant supplyChainAnalysis readable — data already covered by nodesData and edgesData
 
   // All actions are now handled by separate action hooks
 
@@ -207,7 +180,6 @@ export const useCopilotActions = (props: UseCopilotActionsProps) => {
     nodesData,
     edgesData,
     validationSummary,
-    supplyChainAnalysis
   };
 };
 

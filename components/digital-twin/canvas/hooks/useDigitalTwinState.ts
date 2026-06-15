@@ -6,6 +6,7 @@ import { useQueryState } from 'nuqs';
 import debounce from 'lodash.debounce';
 import { migrateEdges } from '../lib/utils';
 import { compressArchData, decompressArchData } from '@/lib/utils/url-compression';
+import { useDigitalTwinStore } from '@/lib/digitalTwinStore';
 
 export function useDigitalTwinState(initialNodes: Node[] = [], initialEdges: Edge[] = []) {
   const [archParam, setArchParam] = useQueryState('arch', {
@@ -113,6 +114,17 @@ export function useDigitalTwinState(initialNodes: Node[] = [], initialEdges: Edg
       }
     }
   }, [nodes, edges, isHydrated, debouncedUpdateURL]);
+
+  // Sync canvas nodes/edges into the Zustand store so ControlTowerPanel
+  // and other global consumers can read the live canvas state.
+  const storeSetNodes = useDigitalTwinStore((s) => s.setNodes);
+  const storeSetEdges = useDigitalTwinStore((s) => s.setEdges);
+  useEffect(() => {
+    if (isHydrated) {
+      storeSetNodes(nodes);
+      storeSetEdges(edges);
+    }
+  }, [nodes, edges, isHydrated, storeSetNodes, storeSetEdges]);
 
   useEffect(() => {
     return () => {

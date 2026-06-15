@@ -1,13 +1,15 @@
+import '@/lib/zod-patch';
 /**
  * Production Scenario Generator Agent (ADK Version)
  * Generates realistic "What-if" supply chain disruption scenarios
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { AgentBuilder, AiSdkLlm } from "@iqai/adk";
-import { createGoogleGenerativeAI } from "@ai-sdk/google";
+import { LlmAgent, Gemini, InMemoryRunner, stringifyContent } from "@google/adk";
+import { withTrace } from '../../../../lib/adk/core/trace';
 import { supabaseServer } from '@/lib/supabase/server';
 import { getAIKeyForModule, AI_MODELS } from '@/lib/ai-config';
+import { agentAudit } from '@/lib/audit-logger';
 
 /**
  * Production Scenario Agent
@@ -43,17 +45,32 @@ class ProductionScenarioAgent {
         Return the response as a valid JSON array of scenario objects.
       `;
 
-      // Configure the model using centralized settings
-      const google = createGoogleGenerativeAI({
-        apiKey: getAIKeyForModule("agents"),
+      const result = await withTrace(`trace-${Date.now()}`, 'ScenarioAgent', async () => {
+        const agent = new LlmAgent({
+          name: "scenario_agent",
+          description: "Simulates supply chain disruptions",
+          instruction: "You are a risk modeling expert. Create diverse, high-impact, and realistic scenarios based on the provided supply chain structure.",
+          model: new Gemini({ model: AI_MODELS.agents, apiKey: getAIKeyForModule("agents") }),
+        });
+
+        const runner = new InMemoryRunner({ appName: 'scenario', agent });
+        
+        let finalContent = "";
+        for await (const event of runner.runEphemeral({
+          userId: 'system',
+          newMessage: { role: 'user', parts: [{ text: prompt }] }
+        })) {
+          const text = stringifyContent(event);
+          if (text) {
+            finalContent += text;
+          }
+        }
+
+        return { success: true, data: finalContent };
       });
 
-      // 3. Execute via ADK
-      const response = await AgentBuilder.create("scenario_agent")
-        .withDescription("Simulates supply chain disruptions")
-        .withInstruction("You are a risk modeling expert. Create diverse, high-impact, and realistic scenarios based on the provided supply chain structure.")
-        .withModel(new AiSdkLlm(google(AI_MODELS.agents) as any))
-        .ask(prompt);
+      if (!result.success) throw new Error(result.error);
+      const response = result.data as string;
 
       // 4. Parse JSON
       const jsonMatch = response.match(/\[[\s\S]*\]/);
@@ -92,11 +109,16 @@ export async function POST(request: NextRequest) {
 
     if (!supplyChainId) return NextResponse.json({ error: "Missing supplyChainId" }, { status: 400 });
 
+    const audit = agentAudit('ScenarioAgent', 'system');
+    audit.start(`Generating ${scenarioCount} scenarios for supply chain ${supplyChainId}`);
+
     const agent = new ProductionScenarioAgent();
     const result = await agent.generateScenarios(supplyChainId, scenarioCount);
     
+    audit.success(`Generated scenarios for supply chain ${supplyChainId}`);
     return NextResponse.json(result);
   } catch (error) {
+    agentAudit('ScenarioAgent', 'system').error(error instanceof Error ? error.message : "Internal Error");
     return NextResponse.json({ 
       success: false, 
       error: error instanceof Error ? error.message : "Internal Error" 

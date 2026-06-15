@@ -1,9 +1,11 @@
+import { createRequire } from 'module';
+
+const require = createRequire(import.meta.url);
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  output: 'standalone',
   devIndicators: false,
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
   typescript: {
     ignoreBuildErrors: true,
   },
@@ -17,8 +19,32 @@ const nextConfig = {
       'zod/v4': 'zod-v4-mini',
     },
   },
-  serverExternalPackages: ['@modelcontextprotocol/sdk'],
-  webpack: (config, { isServer }) => {
+  // Exclude packages that bundle their own zod v4 from webpack bundling
+  serverExternalPackages: [
+    '@modelcontextprotocol/sdk',
+    '@iqai/adk',
+    '@copilotkit/runtime',
+    '@langchain/core',
+    '@ag-ui/langgraph',
+  ],
+  webpack: (config, { isServer, webpack }) => {
+    // NormalModuleReplacementPlugin intercepts zod sub-path imports
+    // at module resolution time — works even when nested packages bundle
+    // their own zod copy that lacks the ./v3 export.
+    config.plugins.push(
+      new webpack.NormalModuleReplacementPlugin(/^zod\/v3$/, require.resolve('zod')),
+      new webpack.NormalModuleReplacementPlugin(/^zod\/v4$/, require.resolve('zod-v4-mini')),
+      new webpack.NormalModuleReplacementPlugin(/^zod\/v4-mini$/, require.resolve('zod-v4-mini')),
+    );
+
+    // Also keep resolve.alias as a belt-and-suspenders fallback
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      'zod/v3': require.resolve('zod'),
+      'zod/v4-mini': require.resolve('zod-v4-mini'),
+      'zod/v4': require.resolve('zod-v4-mini'),
+    };
+
     if (!isServer) {
       config.resolve.fallback = {
         ...config.resolve.fallback,
@@ -31,4 +57,4 @@ const nextConfig = {
   },
 };
 
-export default nextConfig;
+export default nextConfig;

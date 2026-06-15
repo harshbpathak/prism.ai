@@ -1,12 +1,11 @@
-import { tavily } from '@tavily/core';
+import '@/lib/zod-patch';
+import { getTavilyClient } from '@/lib/clients/tavily';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabase/server';
+import { logAudit } from '@/lib/audit-logger';
 
-const tavilyClient = tavily({
-  apiKey: process.env.TAVILY_API_KEY
-});
-
-// In-memory rate-limit guard — avoid hammering Tavily on every request
+// In-memory guard prevents continuous polling if Tavily finds no new articles 
+// (which prevents the database timestamp from updating)
 let lastFetchTime = 0;
 const FETCH_COOLDOWN = 5 * 60 * 1000; // 5 minutes
 
@@ -21,94 +20,92 @@ export async function GET(req: NextRequest) {
 
     const now = Date.now();
 
-    // Only call Tavily if cooldown has expired
-    if (now - lastFetchTime > FETCH_COOLDOWN) {
-      console.log('🔍 Fetching fresh news from Tavily...');
-
-      const searchResult = await tavilyClient.search(
-        'latest supply chain disruption logistics trade news',
-        { topic: 'news', days: 2, maxResults: 10 }
-      );
-
-      if (searchResult.results && searchResult.results.length > 0) {
-        // Fetch all existing live_news URLs for this user to dedup
-        const { data: existingNews } = await supabaseServer
-          .from('notifications')
-          .select('citations')
-          .eq('user_id', userId)
-          .eq('notification_type', 'live_news_alert');
-
-        const existingUrls = new Set(
-          (existingNews || [])
-            .map((n: any) => n.citations?.sources?.[0]?.url)
-            .filter(Boolean)
-        );
-
-        const newArticles = searchResult.results.filter(
-          (r) => !existingUrls.has(r.url)
-        );
-
-        if (newArticles.length > 0) {
-          const inserts = newArticles.map((result) => ({
-            user_id: userId,
-            title: result.title,
-            message: result.content
-              ? result.content.substring(0, 500) + (result.content.length > 500 ? '...' : '')
-              : 'No content available.',
-            notification_type: 'live_news_alert',
-            severity: 'MEDIUM' as const,
-            read_status: false,
-            created_at: result.publishedDate
-              ? new Date(result.publishedDate).toISOString()
-              : new Date().toISOString(),
-            citations: {
-              category: 'Live News',
-              sources: [
-                {
-                  title: result.title,
-                  url: result.url,
-                  publishedAt: result.publishedDate || new Date().toISOString(),
-                  credibility: 0.85,
-                },
-              ],
-              affectedEntities: ['Global Supply Chain'],
-            },
-          }));
-
-          const { error: insertError } = await supabaseServer
-            .from('notifications')
-            .insert(inserts);
-
-          if (insertError) {
-            console.error('⚠️ Failed to persist news to notifications:', insertError.message);
-          } else {
-            console.log(`✅ Saved ${inserts.length} new news articles to Supabase.`);
-          }
-        } else {
-          console.log('📡 No new articles to save — all already persisted.');
-        }
-
-        lastFetchTime = now;
-      }
-    } else {
-      console.log('📡 Tavily cooldown active — serving news from Supabase only.');
-    }
-
-    // Always return the 5 most recent live_news_alert notifications from DB
-    const { data: latestNews, error: fetchError } = await supabaseServer
+    // Deterministic Database Cooldown Check
+    const { data: recentNews } = await supabaseServer
       .from('notifications')
-      .select('*')
+      .select('created_at')
       .eq('user_id', userId)
       .eq('notification_type', 'live_news_alert')
       .order('created_at', { ascending: false })
-      .limit(5);
+      .limit(1);
 
-    if (fetchError) {
-      console.error('⚠️ Failed to fetch news from Supabase:', fetchError.message);
-      return NextResponse.json({ notifications: [] });
+    let shouldFetch = true;
+    
+    // Check in-memory timer first
+    if (now - lastFetchTime < FETCH_COOLDOWN) {
+      shouldFetch = false;
+    }
+    // Then check database timestamp
+    else if (recentNews && recentNews.length > 0) {
+      const lastTime = new Date(recentNews[0].created_at).getTime();
+      if (now - lastTime < FETCH_COOLDOWN) {
+        shouldFetch = false;
+      }
     }
 
-    return NextResponse.json({ notifications: latestNews || [] });
+    // Only call Tavily if cooldown has expired
+    if (shouldFetch) {
+      // Update the memory timer immediately so concurrent requests or empty results 
+      // don't cause an immediate refetch
+      lastFetchTime = now;
+      
+      console.log('🔍 Fetching fresh generic news directly from Tavily (No AI)...');
+
+      // 1. Fetch raw news directly from Tavily
+      const searchResult = await getTavilyClient().search('latest supply chain disruption logistics trade news', { 
+        topic: 'news', 
+        days: 2, 
+        maxResults: 10 
+      });
+
+      if (!searchResult.results || searchResult.results.length === 0) {
+        return NextResponse.json({ notifications: [] });
+      }
+
+      // 2. Fetch existing URLs from DB to deduplicate
+      const { data: existingNews } = await supabaseServer
+        .from('notifications')
+        .select('citations')
+        .eq('user_id', userId)
+        .eq('notification_type', 'live_news_alert');
+
+      const existingUrls = new Set((existingNews || []).map((n: any) => n.citations?.sources?.[0]?.url).filter(Boolean));
+      
+      // 3. Filter out redundant articles
+      const newArticles = searchResult.results.filter((r: any) => !existingUrls.has(r.url));
+
+      // 4. Save strictly new articles to DB
+      if (newArticles.length > 0) {
+        const inserts = newArticles.map((result: any) => ({
+          user_id: userId,
+          title: result.title,
+          message: result.content ? result.content.substring(0, 500) + (result.content.length > 500 ? '...' : '') : 'No content available.',
+          notification_type: 'live_news_alert',
+          severity: 'MEDIUM' as const,
+          read_status: false,
+          created_at: result.publishedDate || new Date().toISOString(),
+          citations: {
+            category: 'Live News',
+            sources: [{ title: result.title, url: result.url, publishedAt: result.publishedDate || new Date().toISOString(), credibility: 0.85 }],
+            affectedEntities: ['Global Supply Chain'],
+          },
+        }));
+        
+        await supabaseServer.from('notifications').insert(inserts);
+        
+        console.log(`✅ Saved ${inserts.length} new generic news articles to DB.`);
+        logAudit({ userId, action: 'news_fetch', details: { status: 'success', summary: `Fetched ${inserts.length} new supply chain news articles via Tavily`, metadata: { articleCount: inserts.length, titles: inserts.map((i: any) => i.title).slice(0, 5) } } });
+        return NextResponse.json({ notifications: inserts });
+      }
+      
+      console.log('✅ No net-new generic news articles found after deduplication.');
+      return NextResponse.json({ notifications: [] });
+
+    } else {
+      console.log('📡 Cooldown active — skipping redundant news poll.');
+      // Return empty array to prevent redundant data transfer
+      return NextResponse.json({ notifications: [] });
+    }
 
   } catch (error: any) {
     console.error('⚠️ News polling failure:', error?.message);

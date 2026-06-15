@@ -91,8 +91,24 @@ export const useAISuggestions = ({ nodes, edges, messages, supplyChainId, userId
         }
       };
 
-      const prompt = `Based on this detailed supply chain context: ${JSON.stringify(fullContext)}, 
-        provide 3-5 actionable suggestions to improve efficiency, reduce risks, or optimize operations. Consider the specific nodes, their properties, connections, risk scores, and relationships.`;
+      // Intelligently cut down payload to save tokens based on user requirements
+      const shorterContext = {
+        locations: {
+          manufacturers: fullContext.supply_chain.nodes.filter(n => n.type?.toLowerCase().includes('manufactur') || n.type?.toLowerCase().includes('factory')).map(n => ({ name: n.label, loc: n.data.address || n.data.location })),
+          producers: fullContext.supply_chain.nodes.filter(n => n.type?.toLowerCase().includes('produc') || n.type?.toLowerCase().includes('supplier')).map(n => ({ name: n.label, loc: n.data.address || n.data.location })),
+          retailers_dealers: fullContext.supply_chain.nodes.filter(n => n.type?.toLowerCase().includes('retail') || n.type?.toLowerCase().includes('distribut') || n.type?.toLowerCase().includes('dealer')).map(n => ({ name: n.label, loc: n.data.address || n.data.location })),
+        },
+        nodeTypes: fullContext.supply_chain.nodeTypes,
+        costs: fullContext.connections.connections.map(c => c.cost).filter(cost => cost > 0)
+      };
+
+      const prompt = `Generate general proactive suggestions for this supply chain graph.
+
+Supply Chain Graph Context:
+${JSON.stringify(shorterContext)}
+
+If the graph is empty or has fewer than 2 nodes, return an empty suggestions array.
+Otherwise, follow the SYSTEM PROMPT rules exactly.`;
 
       const response = await fetch('/api/suggestions', {
         method: 'POST',
@@ -180,8 +196,27 @@ export const useAISuggestions = ({ nodes, edges, messages, supplyChainId, userId
         }))
       };
 
-      const prompt = `Based on the supply chain context and recent conversation: ${JSON.stringify(fullContext)}, 
-        provide 4-6 intelligent query suggestions that would be most relevant for the user to ask next. Focus on actionable questions about optimization, analysis, and improvements.`;
+      // Intelligently cut down payload to save tokens
+      const shorterContext = {
+        locations: {
+          manufacturers: fullContext.supply_chain.nodes.filter(n => n.type?.toLowerCase().includes('manufactur') || n.type?.toLowerCase().includes('factory')).map(n => ({ name: n.label })),
+          producers: fullContext.supply_chain.nodes.filter(n => n.type?.toLowerCase().includes('produc') || n.type?.toLowerCase().includes('supplier')).map(n => ({ name: n.label })),
+          retailers_dealers: fullContext.supply_chain.nodes.filter(n => n.type?.toLowerCase().includes('retail') || n.type?.toLowerCase().includes('distribut') || n.type?.toLowerCase().includes('dealer')).map(n => ({ name: n.label })),
+        },
+        recent_conversation: fullContext.recent_conversation
+      };
+
+      const prompt = `Generate contextual autocomplete/next-step suggestions.
+
+Current Graph State:
+${JSON.stringify(shorterContext.locations)}
+
+Recent Conversation History:
+${JSON.stringify(shorterContext.recent_conversation)}
+
+If the user just ran a simulation or impact analysis, suggest next-step commands (e.g., 'Generate mitigation strategy', 'Calculate financial loss').
+If the graph is empty, suggest node creation commands.
+Limit to 3–4 highly relevant suggestions.`;
 
       const response = await fetch('/api/suggestions', {
         method: 'POST',
@@ -214,47 +249,37 @@ export const useAISuggestions = ({ nodes, edges, messages, supplyChainId, userId
     }
   }, [nodes, edges, messages]);
 
-  // ─── Slow auto-poll for suggestions (60s interval, only when nodes exist) ─────
+  // ─── Event-Driven Triggers (Replaces Background Polling) ────────────
+  
+  // Trigger general suggestions only when the canvas (nodes/edges) changes
+  useEffect(() => {
+    if (nodes.length === 0) return;
+    
+    // Wait 10 seconds after the user stops modifying the canvas before fetching
+    if (suggestionTimeout.current) clearTimeout(suggestionTimeout.current);
+    suggestionTimeout.current = setTimeout(() => {
+      generateContextualSuggestions();
+    }, 10000);
+
+    return () => {
+      if (suggestionTimeout.current) clearTimeout(suggestionTimeout.current);
+    };
+  }, [nodes, edges, generateContextualSuggestions]);
+
+  // Trigger autocomplete suggestions only when the conversation updates
   useEffect(() => {
     if (nodes.length === 0) return;
 
-    // Trigger first fetch after a 20-second initial delay (not immediately)
-    const initialDelay = setTimeout(() => {
-      generateContextualSuggestions();
-    }, 20000);
-
-    // Then repeat every 60 seconds
-    pollIntervalRef.current = setInterval(() => {
-      generateContextualSuggestions();
-    }, POLL_INTERVAL_SUGGESTIONS);
+    // Wait 3 seconds after a new message is added before predicting next questions
+    if (autocompleteTimeout.current) clearTimeout(autocompleteTimeout.current);
+    autocompleteTimeout.current = setTimeout(() => {
+      generateContextualAutocompleteSuggestions();
+    }, 3000);
 
     return () => {
-      clearTimeout(initialDelay);
-      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+      if (autocompleteTimeout.current) clearTimeout(autocompleteTimeout.current);
     };
-    // Only re-run when nodes/edges count changes (not on every render)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [nodes.length, edges.length]);
-
-  // ─── Slow auto-poll for autocomplete suggestions (45s interval) ────────────
-  useEffect(() => {
-    if (nodes.length === 0) return;
-
-    // Trigger first fetch after 30 seconds (staggered from insights)
-    const initialDelay = setTimeout(() => {
-      generateContextualAutocompleteSuggestions();
-    }, 30000);
-
-    autocompletePollRef.current = setInterval(() => {
-      generateContextualAutocompleteSuggestions();
-    }, POLL_INTERVAL_AUTOCOMPLETE);
-
-    return () => {
-      clearTimeout(initialDelay);
-      if (autocompletePollRef.current) clearInterval(autocompletePollRef.current);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [nodes.length, edges.length, messages.length]);
+  }, [messages.length, generateContextualAutocompleteSuggestions]);
 
   // ─── Supabase Realtime subscription for live suggestion updates ────────────
   useEffect(() => {

@@ -20,11 +20,13 @@
     "@copilotkit/react-ui": "^1.9.1",
     "@copilotkit/runtime": "^1.9.1",
     "@copilotkit/runtime-client-gql": "^1.9.1",
+    "@google/adk": "^1.2.0",
     "@google/generative-ai": "^0.24.1",
     "@hookform/resolvers": "^3.10.0",
     "@internationalized/date": "^3.8.2",
     "@iqai/adk": "^0.8.1",
     "@mem0/vercel-ai-provider": "^1.0.6",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "@radix-ui/react-accordion": "^1.2.2",
     "@radix-ui/react-alert-dialog": "^1.1.4",
     "@radix-ui/react-aspect-ratio": "^1.1.1",
@@ -81,6 +83,7 @@
     "exceljs": "^4.4.0",
     "framer-motion": "^12.7.3",
     "graphql": "^16.11.0",
+    "gsap": "^3.15.0",
     "input-otp": "1.4.1",
     "js-cookie": "^3.0.5",
     "leaflet": "^1.9.4",
@@ -91,7 +94,7 @@
     "marked": "^15.0.12",
     "media-chrome": "^4.11.1",
     "mem0ai": "^2.1.31",
-    "next": "15.3.0",
+    "next": "16.2.4",
     "next-themes": "latest",
     "nuqs": "^2.4.3",
     "open-graph-scraper": "^6.10.0",
@@ -122,7 +125,7 @@
     "uuid": "^11.1.0",
     "vaul": "^0.9.6",
     "web-worker": "^1.5.0",
-    "zod": "3.24.2",
+    "zod": "3.25.67",
     "zod-to-json-schema": "^3.25.1",
     "zod-v4-mini": "npm:zod@4.0.0-beta.0",
     "zustand": "^5.0.3"
@@ -140,9 +143,5 @@
     "tailwindcss": "^3.4.17",
     "typescript": "^5"
   },
-  "pnpm": {
-    "overrides": {
-      "import-in-the-middle": "1.15.0"
-    }
-  }
+  "packageManager": "pnpm@11.5.2+sha512.71c631e382066efc25625d5cf029075de07b61b37f6e27350fbd84b1bda5864c8c1967adc280776b45c30a715c0359a3be08fef42d5bb09e2b99029979692916"
 }

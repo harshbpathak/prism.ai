@@ -1,286 +1,234 @@
+"use client";
+
 import { memo } from 'react';
 import { Handle, Position, NodeProps } from 'reactflow';
+import { useDigitalTwinStore } from '@/lib/digitalTwinStore';
+import { Truck, Anchor, Factory, Warehouse, Route, Store } from 'lucide-react';
 
-// Base styles for all nodes
-const baseNodeStyle = {
-  padding: '10px',
-  borderRadius: '8px',
-  width: '150px',
-  boxShadow: '0 4px 6px rgba(40, 0, 10, 0.1)',
-  border: '2px solid #e2e8f0'
-};
-
-// Node type specific colors with more distinct color schemes (fallback colors)
-const nodeTypeColors = {
-  supplier: 'bg-blue-100 border-blue-500 text-blue-800',
-  factory: 'bg-purple-100 border-purple-500 text-purple-800',
-  port: 'bg-cyan-100 border-cyan-500 text-cyan-800',
-  warehouse: 'bg-amber-100 border-amber-500 text-amber-800',
-  distribution: 'bg-emerald-100 border-emerald-500 text-emerald-800',
-  retailer: 'bg-red-100 border-red-500 text-red-800',
-  manufacturer: 'bg-orange-100 border-orange-500 text-orange-800'
-};
-
-// Helper to generate risk class
-const getRiskClass = (riskScore: number) => {
-  if (riskScore >= 0.7) return 'ring-2 ring-red-500 ring-opacity-70';
-  if (riskScore >= 0.4) return 'ring-2 ring-yellow-500 ring-opacity-70';
-  return '';
-};
-
-// Helper to generate selection class with glowing effect
-const getSelectionClass = (selected: boolean) => {
-  return selected 
-    ? 'ring-4 ring-blue-400 ring-opacity-80 shadow-lg shadow-blue-200 transform scale-105 transition-all duration-200' 
-    : 'transition-all duration-200';
-};
-
-// Helper to get node style with custom color or fallback
-const getNodeStyle = (data: any, nodeType: keyof typeof nodeTypeColors) => {
-  if (data.nodeColor) {
-    // Use custom color from node data with enhanced styling
-    return {
-      ...baseNodeStyle,
-      backgroundColor: data.nodeColor,
-      color: getContrastColor(data.nodeColor), // Ensure text is readable
-      borderColor: data.nodeColor, // Use the same color for border
-      borderWidth: '2px',
-      borderStyle: 'solid'
-    };
+// Get active node styling and colors
+const nodeTypeConfigs = {
+  supplier: {
+    label: 'SUPPLIER',
+    colorHex: '#2748E8',
+    icon: Truck
+  },
+  port: {
+    label: 'PORT',
+    colorHex: '#1A7F4B',
+    icon: Anchor
+  },
+  factory: {
+    label: 'FACTORY',
+    colorHex: '#B45309',
+    icon: Factory
+  },
+  warehouse: {
+    label: 'WAREHOUSE',
+    colorHex: '#7C3AED',
+    icon: Warehouse
+  },
+  distribution: {
+    label: 'DISTRIBUTION',
+    colorHex: '#B91C1C',
+    icon: Route
+  },
+  retailer: {
+    label: 'RETAILER',
+    colorHex: '#6B7280',
+    icon: Store
+  },
+  manufacturer: {
+    label: 'MANUFACTURER',
+    colorHex: '#B45309',
+    icon: Factory
   }
-  // Fallback to default styles with CSS classes
-  return baseNodeStyle;
 };
 
-// Helper to determine if text should be dark or light based on background color
-const getContrastColor = (hexColor: string): string => {
-  // Remove # if present
-  const hex = hexColor.replace('#', '');
-  
-  // Convert to RGB
-  const r = parseInt(hex.substr(0, 2), 16);
-  const g = parseInt(hex.substr(2, 2), 16);
-  const b = parseInt(hex.substr(4, 2), 16);
-  
-  // Calculate brightness
-  const brightness = ((r * 299) + (g * 587) + (b * 114)) / 1000;
-  
-  // Return black for light backgrounds, white for dark backgrounds
-  return brightness > 155 ? '#000000' : '#FFFFFF';
-};
+interface BaseNodeProps extends NodeProps {
+  nodeType: keyof typeof nodeTypeConfigs;
+  showLeftHandle?: boolean;
+  showRightHandle?: boolean;
+}
 
-// Supplier Node
-export const SupplierNode = memo(({ data, isConnectable, selected }: NodeProps) => {
-  const riskClass = getRiskClass(data.riskScore);
-  const typeClass = data.nodeColor ? '' : nodeTypeColors.supplier;
-  const selectionClass = getSelectionClass(selected);
-  const nodeStyle = getNodeStyle(data, 'supplier');
+const BaseNode = memo(({
+  id,
+  data,
+  isConnectable,
+  selected,
+  nodeType,
+  showLeftHandle = true,
+  showRightHandle = true
+}: BaseNodeProps) => {
+  const config = nodeTypeConfigs[nodeType] || nodeTypeConfigs.supplier;
+  const Icon = config.icon;
+
+  const { disruptedNodes } = useDigitalTwinStore();
+  const isDisrupted = disruptedNodes.includes(id);
+
+  // High risk conditions
+  const isHighRisk = data.riskScore >= 0.7 || 
+                     data.riskLevel === 'High' || 
+                     data.riskLevel === 'HIGH' || 
+                     (nodeType === 'retailer' && isDisrupted);
+
+  const isWatch = (data.riskScore >= 0.4 && data.riskScore < 0.7) || 
+                  data.riskLevel === 'Medium' || 
+                  data.riskLevel === 'Watch';
+
+  // Status mapping
+  let statusText = 'Healthy';
+  let statusColorClass = 'bg-[#1A7F4B]';
+
+  if (isDisrupted) {
+    statusText = 'Disrupted';
+    statusColorClass = 'bg-[#B91C1C]';
+  } else if (isHighRisk) {
+    statusText = 'High Risk';
+    statusColorClass = 'bg-[#B91C1C]';
+  } else if (isWatch) {
+    statusText = 'Watch';
+    statusColorClass = 'bg-[#B45309]';
+  } else if (data.status) {
+    statusText = data.status;
+    const lowerStatus = statusText.toLowerCase();
+    if (lowerStatus === 'healthy') statusColorClass = 'bg-[#1A7F4B]';
+    else if (lowerStatus === 'watch') statusColorClass = 'bg-[#B45309]';
+    else if (lowerStatus === 'disrupted' || lowerStatus === 'critical') statusColorClass = 'bg-[#B91C1C]';
+  }
+
+  const borderHex = data.nodeColor || config.colorHex;
+  const borderStyle = {
+    border: `1px solid ${isHighRisk ? '#B91C1C' : borderHex}`
+  };
+
+  const isRootDisruption = disruptedNodes.length > 0 && disruptedNodes[0] === id;
+  const disruptionBorderClass = isRootDisruption 
+    ? 'animate-pulse-border-red border-2' 
+    : isDisrupted 
+      ? 'animate-pulse-border-orange border-2' 
+      : '';
+
+  const selectedClass = selected 
+    ? 'ring-2 ring-[#2748E8] ring-offset-2 dark:ring-offset-zinc-950 scale-[1.02]' 
+    : '';
 
   return (
-    <div 
-      style={nodeStyle} 
-      className={`${data.nodeColor ? 'border-0' : typeClass} ${riskClass} ${selectionClass}`}
+    <div
+      style={borderStyle}
+      title="Click to view node details"
+      className={`relative w-[190px] rounded-xl px-3 py-2.5 transition-all duration-200 shadow-sm text-left cursor-pointer ${
+        isHighRisk 
+          ? 'bg-[#FEF2F2] dark:bg-[#2A1515]' 
+          : 'bg-white dark:bg-zinc-900'
+      } ${disruptionBorderClass} ${selectedClass}`}
     >
-      <Handle
-        type="target"
-        position={Position.Left}
-        isConnectable={isConnectable}
-      />
-      <Handle
-        type="source"
-        position={Position.Right}
-        isConnectable={isConnectable}
-      />
-      
-      <div className="font-bold text-sm text-center">{data.label}</div>
-    </div>
-  );
-});
-
-// Factory Node
-export const FactoryNode = memo(({ data, isConnectable, selected }: NodeProps) => {
-  const riskClass = getRiskClass(data.riskScore);
-  const typeClass = data.nodeColor ? '' : nodeTypeColors.factory;
-  const selectionClass = getSelectionClass(selected);
-  const nodeStyle = getNodeStyle(data, 'factory');
-
-  return (
-    <div 
-      style={nodeStyle} 
-      className={`${data.nodeColor ? 'border-0' : typeClass} ${riskClass} ${selectionClass}`}
-    >
-      <Handle
-        type="target"
-        position={Position.Left}
-        isConnectable={isConnectable}
-      />
-      <Handle
-        type="source"
-        position={Position.Right}
-        isConnectable={isConnectable}
-      />
-
-      <div className="font-bold text-sm text-center">{data.label}</div>
-    </div>
-  );
-});
-
-// Port Node
-export const PortNode = memo(({ data, isConnectable, selected }: NodeProps) => {
-  const riskClass = getRiskClass(data.riskScore);
-  const typeClass = data.nodeColor ? '' : nodeTypeColors.port;
-  const selectionClass = getSelectionClass(selected);
-  const nodeStyle = getNodeStyle(data, 'port');
-  
-  return (
-    <div 
-      style={nodeStyle} 
-      className={`${data.nodeColor ? 'border-0' : typeClass} ${riskClass} ${selectionClass}`}
-    >
-      <Handle
-        type="target"
-        position={Position.Left}
-        isConnectable={isConnectable}
-      />
-      <Handle
-        type="source"
-        position={Position.Right}
-        isConnectable={isConnectable}
-      />
-      
-      <div className="font-bold text-sm text-center">{data.label}</div>
-    </div>
-  );
-});
-
-// Warehouse Node
-export const WarehouseNode = memo(({ data, isConnectable, selected }: NodeProps) => {
-  const riskClass = getRiskClass(data.riskScore);
-  const typeClass = data.nodeColor ? '' : nodeTypeColors.warehouse;
-  const selectionClass = getSelectionClass(selected);
-  const nodeStyle = getNodeStyle(data, 'warehouse');
-  
-  return (
-    <div 
-      style={nodeStyle} 
-      className={`${data.nodeColor ? 'border-0' : typeClass} ${riskClass} ${selectionClass}`}
-    >
-      <Handle
-        type="target"
-        position={Position.Left}
-        isConnectable={isConnectable}
-      />
-      <Handle
-        type="source"
-        position={Position.Right}
-        isConnectable={isConnectable}
-      />
-      
-      <div className="font-bold text-sm text-center">{data.label}</div>
-    </div>
-  );
-});
-
-// Distribution Node
-export const DistributionNode = memo(({ data, isConnectable, selected }: NodeProps) => {
-  const riskClass = getRiskClass(data.riskScore);
-  const typeClass = data.nodeColor ? '' : nodeTypeColors.distribution;
-  const selectionClass = getSelectionClass(selected);
-  const nodeStyle = getNodeStyle(data, 'distribution');
-  
-  return (
-    <div 
-      style={nodeStyle} 
-      className={`${data.nodeColor ? 'border-0' : typeClass} ${riskClass} ${selectionClass}`}
-    >
-      <Handle
-        type="target"
-        position={Position.Left}
-        isConnectable={isConnectable}
-      />
-      <Handle
-        type="source"
-        position={Position.Right}
-        isConnectable={isConnectable}
-      />
-      
-      <div className="font-bold text-sm text-center">{data.label}</div>
-    </div>
-  );
-});
-
-// Retailer Node
-export const RetailerNode = memo(({ data, isConnectable, selected }: NodeProps) => {
-  const riskClass = getRiskClass(data.riskScore);
-  const typeClass = data.nodeColor ? '' : nodeTypeColors.retailer;
-  const selectionClass = getSelectionClass(selected);
-  const nodeStyle = getNodeStyle(data, 'retailer');
-  
-  return (
-    <div 
-      style={nodeStyle} 
-      className={`${data.nodeColor ? 'border-0' : typeClass} ${riskClass} ${selectionClass}`}
-    >
-      <Handle
-        type="target"
-        position={Position.Left}
-        isConnectable={isConnectable}
-      />
-      
-      <div className="font-bold text-sm text-center">{data.label}</div>
-    </div>
-  );
-});
-
-// Manufacturer / Production Node
-export const ManufacturerNode = memo(({ data, isConnectable, selected }: NodeProps) => {
-  const riskClass = getRiskClass(data.riskScore);
-  const typeClass = data.nodeColor ? '' : nodeTypeColors.manufacturer;
-  const selectionClass = getSelectionClass(selected);
-  const nodeStyle = getNodeStyle(data, 'manufacturer');
-  
-  return (
-    <div 
-      style={nodeStyle} 
-      className={`${data.nodeColor ? 'border-0' : typeClass} ${riskClass} ${selectionClass}`}
-    >
-      <Handle
-        type="target"
-        position={Position.Left}
-        isConnectable={isConnectable}
-      />
-      <Handle
-        type="source"
-        position={Position.Right}
-        isConnectable={isConnectable}
-      />
-      
-      <div className="font-bold text-sm text-center">{data.label}</div>
-      {data.label?.toLowerCase().includes('india') && (
-        <div className="text-xs text-center mt-1">🇮🇳</div>
+      {showLeftHandle && (
+        <Handle
+          type="target"
+          position={Position.Left}
+          isConnectable={isConnectable}
+          className="!w-2.5 !h-2.5 !bg-theme-border-default hover:!bg-[#2748E8] transition-colors"
+        />
       )}
-    </div>
-  );
-});
+      {showRightHandle && (
+        <Handle
+          type="source"
+          position={Position.Right}
+          isConnectable={isConnectable}
+          className="!w-2.5 !h-2.5 !bg-theme-border-default hover:!bg-[#2748E8] transition-colors"
+        />
+      )}
 
-// Template Group Node
-export const TemplateGroupNode = memo(({ data, selected }: NodeProps) => {
-  // Use a simpler selection class for template groups without the blue ring
-  const templateSelectionClass = selected ? 'transition-all duration-200' : 'transition-all duration-200';
-  
-  return (
-    <div 
-      className={`template-group ${templateSelectionClass}`}
-      data-label={data.label}
-      title="Double-click to ungroup this template"
-    >
-      {/* Template content area - children nodes will be positioned here */}
-      <div className="h-full w-full">
-        {/* This div provides space for child nodes */}
+      {/* High Risk Badge */}
+      {isHighRisk && (
+        <span className="absolute top-2.5 right-2 px-1.5 py-0.5 rounded text-[8px] font-bold tracking-wider uppercase bg-[#B91C1C] text-white">
+          HIGH RISK
+        </span>
+      )}
+
+      {/* Top row: icon + type label */}
+      <div className="flex items-center gap-1.5 mb-1.5">
+        <Icon className="w-3.5 h-3.5" style={{ color: isHighRisk ? '#B91C1C' : borderHex }} />
+        <span className="text-[9px] font-bold tracking-wider uppercase" style={{ color: isHighRisk ? '#B91C1C' : borderHex }}>
+          {config.label}
+        </span>
+      </div>
+
+      {/* Middle row: node name */}
+      <div className="font-semibold text-xs leading-tight text-[#18160F] dark:text-[#F0EDE7] mb-2 truncate" title={data.label}>
+        {data.label}
+      </div>
+
+      {/* Bottom row: status dot + status text */}
+      <div className="flex items-center gap-1.5">
+        <span className={`w-1.5 h-1.5 rounded-full ${statusColorClass}`} />
+        <span className="text-[10px] font-medium text-theme-text-secondary">
+          {statusText}
+        </span>
       </div>
     </div>
   );
 });
+
+BaseNode.displayName = 'BaseNode';
+
+// Supplier Node
+export const SupplierNode = memo((props: NodeProps) => (
+  <BaseNode {...props} nodeType="supplier" />
+));
+SupplierNode.displayName = 'SupplierNode';
+
+// Factory Node
+export const FactoryNode = memo((props: NodeProps) => (
+  <BaseNode {...props} nodeType="factory" />
+));
+FactoryNode.displayName = 'FactoryNode';
+
+// Port Node
+export const PortNode = memo((props: NodeProps) => (
+  <BaseNode {...props} nodeType="port" />
+));
+PortNode.displayName = 'PortNode';
+
+// Warehouse Node
+export const WarehouseNode = memo((props: NodeProps) => (
+  <BaseNode {...props} nodeType="warehouse" />
+));
+WarehouseNode.displayName = 'WarehouseNode';
+
+// Distribution Node
+export const DistributionNode = memo((props: NodeProps) => (
+  <BaseNode {...props} nodeType="distribution" />
+));
+DistributionNode.displayName = 'DistributionNode';
+
+// Retailer Node
+export const RetailerNode = memo((props: NodeProps) => (
+  <BaseNode {...props} nodeType="retailer" showRightHandle={false} />
+));
+RetailerNode.displayName = 'RetailerNode';
+
+// Manufacturer / Production Node
+export const ManufacturerNode = memo((props: NodeProps) => (
+  <BaseNode {...props} nodeType="manufacturer" />
+));
+ManufacturerNode.displayName = 'ManufacturerNode';
+
+// Template Group Node
+export const TemplateGroupNode = memo(({ data, selected }: NodeProps) => {
+  const templateSelectionClass = selected ? 'ring-2 ring-blue-500/50' : '';
+  
+  return (
+    <div 
+      className={`template-group h-full w-full border border-dashed border-[#D6CFC4] dark:border-zinc-800 rounded-lg bg-black/[0.02] dark:bg-white/[0.02] ${templateSelectionClass}`}
+      data-label={data.label}
+      title="Double-click to ungroup this template"
+    >
+      <div className="h-full w-full" />
+    </div>
+  );
+});
+TemplateGroupNode.displayName = 'TemplateGroupNode';
 
 export const nodeTypes = {
   supplierNode: SupplierNode,
@@ -289,8 +237,11 @@ export const nodeTypes = {
   warehouseNode: WarehouseNode,
   distributionNode: DistributionNode,
   retailerNode: RetailerNode,
-  customerNode: RetailerNode,  // AI sometimes generates "customerNode" — alias to retailer
+  customerNode: RetailerNode,
   manufacturerNode: ManufacturerNode,
-  productionNode: ManufacturerNode, // Alias for production nodes
+  productionNode: ManufacturerNode,
+  'supply-chain-node': WarehouseNode,
+  supplyChainNode: WarehouseNode,
+  genericNode: WarehouseNode,
   group: TemplateGroupNode,
-}; 
+};

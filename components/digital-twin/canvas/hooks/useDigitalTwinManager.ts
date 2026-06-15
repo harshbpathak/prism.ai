@@ -139,6 +139,18 @@ export function useDigitalTwinManager({
     setShowValidationDialog(false);
   }, [setChatMode, setShowValidationDialog]);
 
+  // Handle AI analysis request from Right Panel
+  const handleAnalyzeNode = useCallback((nodeId: string, nodeLabel: string) => {
+    const aiPrompt = `Analyze the node "${nodeLabel}" (ID: ${nodeId}). What role does it play in this supply chain, what is its current health/risk status, and are there any critical dependencies or vulnerabilities I should be aware of?`;
+    
+    // Switch to immersive chat mode
+    setChatMode('immersive');
+    setIsLeftPanelCollapsed(false);
+    
+    // Store the message to be sent to AI
+    setPendingAIMessage(aiPrompt);
+  }, [setChatMode]);
+
   return {
     nodes,
     edges,
@@ -175,6 +187,9 @@ export function useDigitalTwinManager({
       viewOnly,
     },
     leftPanelProps: {
+      supplyChainName,
+      selectedSupplyChain,
+      setSelectedSupplyChain,
       onAddNode: nodeEdgeActions.handleAddNode,
       onAddNodeAtPosition: nodeEdgeActions.handleAddNodeAtPosition,
       onClearAllNodes: nodeEdgeActions.handleClearAllNodes,
@@ -213,7 +228,8 @@ export function useDigitalTwinManager({
       onUpdate,
       onDelete: nodeEdgeActions.handleDeleteNode,
       onUngroup: finalTemplateManager.handleUngroupTemplate,
-      onSave: async () => { await handleSave(); },
+      onSave: async () => { await handleSave(undefined, undefined, true); },
+      onAnalyzeNode: handleAnalyzeNode,
     },
     // Add AI fix handler for ValidationDialog
     handleAIFixRequest,

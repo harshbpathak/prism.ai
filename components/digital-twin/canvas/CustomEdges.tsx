@@ -6,6 +6,7 @@ import {
   EdgeLabelRenderer,
   getSmoothStepPath
 } from 'reactflow';
+import { useDigitalTwinStore } from '@/lib/digitalTwinStore';
 
 export const TransportEdge = ({
   id,
@@ -30,6 +31,29 @@ export const TransportEdge = ({
     targetPosition
   });
 
+  const { nodes, disruptedEdges, disruptedNodes } = useDigitalTwinStore();
+  const isDisrupted = disruptedEdges.includes(id);
+
+  // Check if either connected node is high-risk or disrupted
+  const sourceNode = nodes.find(n => n.id === source);
+  const targetNode = nodes.find(n => n.id === target);
+
+  const isSourceAtRisk = sourceNode && (
+    (sourceNode.data?.riskScore && sourceNode.data.riskScore >= 0.7) || 
+    sourceNode.data?.riskLevel === 'High' || 
+    sourceNode.data?.riskLevel === 'HIGH' || 
+    disruptedNodes.includes(source)
+  );
+
+  const isTargetAtRisk = targetNode && (
+    (targetNode.data?.riskScore && targetNode.data.riskScore >= 0.7) || 
+    targetNode.data?.riskLevel === 'High' || 
+    targetNode.data?.riskLevel === 'HIGH' || 
+    disruptedNodes.includes(target)
+  );
+
+  const isAtRisk = isSourceAtRisk || isTargetAtRisk;
+
   // Get emoji and text for transport mode
   const getTransportInfo = () => {
     switch (data?.mode) {
@@ -53,8 +77,10 @@ export const TransportEdge = ({
         path={edgePath}
         id={id}
         style={{
-          strokeWidth: 2,
-          stroke: '#64748b',
+          strokeWidth: (isDisrupted || isAtRisk) ? 3 : 2,
+          stroke: (isDisrupted || isAtRisk) ? '#B91C1C' : 'var(--border-default)',
+          strokeDasharray: (isDisrupted || isAtRisk) ? '5,5' : 'none',
+          animation: (isDisrupted || isAtRisk) ? 'dashdraw 1.5s linear infinite' : 'none',
           ...style
         }}
       />
@@ -65,29 +91,35 @@ export const TransportEdge = ({
             position: 'absolute',
             transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
             pointerEvents: 'all',
-            backgroundColor: 'white',
-            padding: selected ? '6px 12px' : '4px 8px',
-            borderRadius: '8px',
-            fontSize: '14px',
+            backgroundColor: 'var(--bg-surface)',
+            color: 'var(--text-primary)',
+            padding: selected ? '6px 12px' : '0',
+            width: selected ? 'auto' : '20px',
+            height: selected ? 'auto' : '20px',
+            borderRadius: selected ? '6px' : '50%',
+            fontSize: selected ? '13px' : '11px',
             fontWeight: 500,
-            border: '1px solid #e2e8f0',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+            border: '1px solid var(--border-subtle)',
+            boxShadow: 'var(--shadow-sm)',
             display: 'flex',
             alignItems: 'center',
+            justifyContent: 'center',
             gap: '6px',
-            minWidth: 'max-content'
+            minWidth: selected ? 'max-content' : '20px'
           }}
-          className="nodrag nopan"
+          className="nodrag nopan hover:border-theme-blue/50 transition-colors"
         >
-          <span style={{ fontSize: '16px' }}>{transportInfo.emoji}</span>
-          {selected && <span style={{ color: '#374151' }}>{transportInfo.text}</span>}
+          <span style={{ fontSize: selected ? '14px' : '11px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            {transportInfo.emoji}
+          </span>
+          {selected && <span style={{ color: 'var(--text-primary)' }}>{transportInfo.text}</span>}
           
           {selected && (
             <div style={{ 
-              fontSize: '12px', 
-              color: '#6b7280',
+              fontSize: '11px', 
+              color: 'var(--text-muted)',
               marginLeft: '8px',
-              borderLeft: '1px solid #e2e8f0',
+              borderLeft: '1px solid var(--border-subtle)',
               paddingLeft: '8px'
             }}>
               <div>💰 ${data?.cost || 0}</div>
@@ -101,5 +133,10 @@ export const TransportEdge = ({
 };
 
 export const edgeTypes = {
-  transportEdge: TransportEdge
+  transportEdge: TransportEdge,
+  sea: TransportEdge,
+  air: TransportEdge,
+  rail: TransportEdge,
+  road: TransportEdge,
+  default: TransportEdge
 };
