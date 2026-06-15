@@ -389,10 +389,10 @@ The Dockerfile uses:
 ## 🔄 Autonomous Agent Lifecycle
 
 ```
-┌──────────────────────────────────────────────────────┐
+┌────────────────────────────────────────────────── ────┐
 │                   Frontend (Dashboard)                │
-│                                                      │
-│  ┌─────────────┐ ┌──────────┐ ┌───────────────────┐  │
+│                                                       │
+│  ┌────────── ───┐ ┌──────────┐ ┌───────────────────┐  │
 │  │ Notification │ │ News Room│ │  Weather Timeline │  │
 │  │    Feed      │ │ Timeline │ │   (Segregated)    │  │
 │  └──────┬───────┘ └────┬─────┘ └────────┬──────────┘  │
@@ -402,7 +402,7 @@ The Dockerfile uses:
     Every 30s       Every 2min       Every 3hrs
           │              │                │
           ▼              ▼                ▼
-┌──────────────┐ ┌──────────────┐ ┌──────────────────┐
+┌──────────────┐ ┌──────────────┐ ┌───────────────── ─┐
 │  Automated   │ │ News Polling │ │    Weather        │
 │  Alerts Agent│ │    Agent     │ │ Intelligence Agent│
 │  (Tavily +   │ │ (Tavily raw  │ │ (OpenWeather +    │
@@ -412,7 +412,7 @@ The Dockerfile uses:
        ▼                ▼                  ▼
 ┌────────────────────────────────────────────────┐
 │              Supabase PostgreSQL               │
-│  notifications │ weather_intelligence │ audit   │
+│  notifications │ weather_intelligence │ audit  │
 └────────────────────────────────────────────────┘
 ```
 
@@ -439,10 +439,5 @@ The Dockerfile uses:
 
 ---
 
-## 📄 License
-
-This project is developed for the **Google Cloud x AMD Hackathon**.
-
----
 
 *Built with ❤️ by the PRISM Team*
