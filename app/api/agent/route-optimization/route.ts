@@ -83,9 +83,17 @@ export async function POST(req: NextRequest) {
 
     if (!traceResult.success) throw new Error(traceResult.error);
 
-    const jsonMatch = (traceResult.data as string).match(/\{[\s\S]*\}/);
-    if (!jsonMatch) throw new Error('Failed to parse route-optimization JSON from ADK');
-    const object = JSON.parse(jsonMatch[0]);
+    const rawData = traceResult.data as string;
+    const jsonMatch = rawData.match(/\{[\s\S]*\}/);
+    
+    let object;
+    if (!jsonMatch) {
+      console.warn('⚠️ No JSON found in ADK response. Raw output:', rawData);
+      // Trigger the fallback mechanism for empty/invalid responses
+      throw new Error('OVERLOADED_OR_EMPTY: Failed to parse route-optimization JSON');
+    } else {
+      object = JSON.parse(jsonMatch[0]);
+    }
 
     return NextResponse.json(object);
   } catch (error: any) {
