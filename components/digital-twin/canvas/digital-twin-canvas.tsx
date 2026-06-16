@@ -217,7 +217,7 @@ export default function DigitalTwinCanvas({ initialNodes, initialEdges, viewOnly
       {/* Only show SimulationToolbar in edit mode */}
       {!viewOnly && <SimulationToolbar {...simulationToolbarProps} />}
 
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 overflow-hidden relative">
         {/* Only show LeftPanel in edit mode */}
         {!viewOnly && !isControlTowerMode && <LeftPanel {...leftPanelProps} />}
         

@@ -7,7 +7,7 @@ import { getAIKeyForModule, AI_MODELS } from '@/lib/ai-config';
 import { withTrace } from '../../../../lib/adk/core/trace';
 import { agentAudit } from '@/lib/audit-logger';
 
-const OPENWEATHER_API_KEY = process.env.OPENWEATHER_API_KEY!;
+
 // Severe weather codes from OpenWeather API
 // 2xx = Thunderstorm, 502–504 = Heavy/Extreme Rain, 6xx = Snow, 711 = Smoke, 721 = Haze, 781 = Tornado
 const ADVERSE_CODES = new Set([
@@ -30,7 +30,7 @@ const weatherImpactSchema = z.object({
 async function fetchWeatherAt(lat: number, lng: number): Promise<any | null> {
   try {
     const res = await fetch(
-      `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lng}&appid=${OPENWEATHER_API_KEY}&units=metric`,
+      `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lng}&appid=${process.env.OPENWEATHER_API_KEY}&units=metric`,
       { signal: AbortSignal.timeout(6000) }
     );
     if (!res.ok) return null;

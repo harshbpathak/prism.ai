@@ -20,9 +20,15 @@ export default function DashboardPage() {
           display: flex; align-items: center; justify-content: space-between;
           padding: 0 28px; flex-shrink: 0;
         }
+        @media (max-width: 640px) {
+          .topbar { padding: 0 16px; }
+        }
         .topbar-left { display: flex; flex-direction: column; }
         .topbar-title { font-size: 1.1rem; font-weight: 700; color: #18160F; letter-spacing: -0.02em; }
         .topbar-sub { font-size: 0.75rem; color: #9C9489; }
+        @media (max-width: 480px) {
+          .topbar-sub { display: none; }
+        }
         .topbar-right { display: flex; align-items: center; gap: 10px; }
         .live-pill { display: flex; align-items: center; gap: 6px; background: #EDFAF3; border: 1px solid rgba(26,127,75,0.2); border-radius: 100px; padding: 4px 12px; font-size: 0.7rem; font-weight: 700; color: #1A7F4B; }
         .live-dot { width: 6px; height: 6px; border-radius: 50%; background: #1A7F4B; animation: pulse-live 1.5s ease-in-out infinite; }
@@ -30,6 +36,9 @@ export default function DashboardPage() {
 
         /* CONTENT AREA */
         .content { flex: 1; display: flex; flex-direction: column; gap: 20px; padding: 24px 28px; }
+        @media (max-width: 767px) {
+          .content { padding: 16px; }
+        }
 
         /* STATS ROW */
         .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }

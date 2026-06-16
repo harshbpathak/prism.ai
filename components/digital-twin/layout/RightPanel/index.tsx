@@ -183,7 +183,7 @@ const RightPanel: FC<RightPanelProps> = ({
   if (!selectedElement) {
     return (
       <motion.div 
-        className="border-l border-theme-border-subtle bg-theme-bg-surface flex flex-col h-full overflow-hidden w-[300px] flex-shrink-0 z-20"
+        className="border-l border-theme-border-subtle bg-theme-bg-surface flex flex-col h-full overflow-hidden w-[300px] flex-shrink-0 z-20 lg:relative absolute right-0 top-0 shadow-lg lg:shadow-none"
         variants={panelVariants}
         animate="expanded"
         initial={false}
@@ -228,7 +228,7 @@ const RightPanel: FC<RightPanelProps> = ({
 
   return (
     <motion.div 
-      className="border-l border-theme-border-subtle bg-theme-bg-surface flex flex-col h-full overflow-hidden w-[300px] flex-shrink-0 z-20"
+      className="border-l border-theme-border-subtle bg-theme-bg-surface flex flex-col h-full overflow-hidden w-[300px] flex-shrink-0 z-20 lg:relative absolute right-0 top-0 shadow-lg lg:shadow-none"
       variants={panelVariants}
       animate="expanded"
       initial={false}

@@ -203,7 +203,7 @@ export function NotificationFeed() {
     async function fetchAuditLogs() {
       try {
         setLoadingLogs(true)
-        const res = await fetch(`/api/audit-logs?userId=${user.id}`)
+        const res = await fetch(`/api/audit-logs?userId=${user?.id}`)
         if (res.ok) {
           const data = await res.json()
           setAuditLogs(data.logs || [])
@@ -513,10 +513,9 @@ export function NotificationFeed() {
                         </div>
                       </div>
                       
-                      {/* Content */}
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-start justify-between mb-2">
-                          <div className="flex items-center gap-2">
+                        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2 mb-2">
+                          <div className="flex flex-wrap items-center gap-2">
                             <p className="font-[600] text-theme-text-primary text-[0.88rem] leading-[1.4]">{notification.title}</p>
                             {/* Visual indicator for Live News */}
                             {notification.notification_type === 'live_news_alert' && (
@@ -530,7 +529,7 @@ export function NotificationFeed() {
                             )}
                           </div>
                           
-                          <div className="flex items-center gap-3 flex-shrink-0">
+                          <div className="flex items-center gap-2 flex-shrink-0">
                             {notification.severity && (
                               <span className={cn(
                                 "text-[0.65rem] font-[700] tracking-[0.05em] py-[2px] px-[8px] rounded-theme-pill border border-transparent",
@@ -735,8 +734,8 @@ export function NotificationFeed() {
   return (
     <div className="p-4">
       {/* Main Tab Navigation */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="bg-theme-bg-secondary border border-theme-border-subtle rounded-theme-pill p-[3px] flex space-x-1 w-fit">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
+        <div className="bg-theme-bg-secondary border border-theme-border-subtle rounded-theme-pill p-[3px] flex flex-wrap gap-1 w-fit sm:space-x-1">
           {[
             { id: "alerts" as MainTab, label: "Threat Alerts" },
             { id: "news" as MainTab, label: "Live News" },
@@ -759,7 +758,7 @@ export function NotificationFeed() {
         </div>
         <Link 
           href="/news-room" 
-          className="text-[0.82rem] text-theme-blue font-[500] hover:text-theme-blue/80 hover:underline underline-offset-4 transition-colors flex items-center gap-1"
+          className="text-[0.82rem] text-theme-blue font-[500] hover:text-theme-blue/80 hover:underline underline-offset-4 transition-colors flex items-center gap-1 w-fit"
         >
           View Real-Time Alerts
           <ArrowRight className="h-3.5 w-3.5" />
